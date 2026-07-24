@@ -1,0 +1,6 @@
+*.exe
+*.pdb
+karl2d
+bin
+.vscode
+build
