@@ -5,6 +5,7 @@ import "core:encoding/json"
 import "core:strconv"
 import "core:mem"
 import hm "core:container/handle_map"
+import k2 "karl2d"
 
 Ogmo_Entity_Values :: struct {
 	key: string,
@@ -42,7 +43,13 @@ Ogmo_Map :: struct {
 }
 
 load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
-	g_world = {}
+	g_world = {
+		camera = k2.Camera{
+			zoom = 2.0,
+			offset = { SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 },
+		},
+		time_since_player_switch = 0,
+	}
 	mem.arena_init(&g_world.arena, g_world_memory)
 	context.allocator = mem.arena_allocator(&g_world.arena)
 	
@@ -103,6 +110,7 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 					if turn := ogmo_ent.values.turn; turn > highest_turn {
 						highest_turn = turn
 						g_world.active_player = new_handle
+						g_world.camera.target = ent.sprite_pos
 					}
 				}
 		}

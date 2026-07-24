@@ -3,6 +3,7 @@ package main
 import "core:log"
 import "core:fmt"
 import "core:mem"
+import "core:math"
 import hm "core:container/handle_map"
 import k2 "karl2d"
 
@@ -58,6 +59,8 @@ g_world := struct{
     walls: [dynamic]int,
     floor_cols, floor_rows: int,
     floors: [dynamic]int,
+    camera: k2.Camera,
+    time_since_player_switch: f32,
     ents: hm.Static_Handle_Map(512, Entity, Entity_Handle),
     active_player: Entity_Handle,
 }{}
@@ -108,28 +111,46 @@ step :: proc() -> bool {
     }
 
 	delta_time := k2.get_frame_time()
-	
-    camera := k2.Camera{
-        zoom = 2.0,
-        offset = { SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 },
-    }
+
+    g_world.time_since_player_switch += delta_time
+    next_player_type: Maybe(Player_Type)
 
     // Update entities
     it := hm.iterator_make(&g_world.ents)
     for ent, handle in hm.iterate(&it) {
         if handle == g_world.active_player {
+            player_data, is_player := ent.data.(Player_Data)
+            assert(is_player)
             update_player(ent, delta_time)
+
+            if k2.key_went_down(.E) || k2.key_went_down(.Period) {
+                next_player_type = Player_Type((int(player_data.type) + 1) % len(Player_Type))
+            } else if k2.key_went_down(.Q) || k2.key_went_down(.Comma) {
+                next_player_type = Player_Type((int(player_data.type) + len(Player_Type) - 1) % len(Player_Type))
+            } 
+
+            g_world.camera.target += (ent.sprite_pos - g_world.camera.target) * 0.5            
         }
         // Smoothly move sprite to new position.
         new_sprite_pos := cast([2]f32)(ent.pos * TILE_SIZE)
         ent.sprite_pos += (new_sprite_pos - ent.sprite_pos) * 0.5
-        if handle == g_world.active_player {
-            camera.target = ent.sprite_pos
+    }
+
+    // Change player
+    if next_player_type != nil {
+        g_world.time_since_player_switch = 0.0
+        it = hm.iterator_make(&g_world.ents)
+        for ent, handle in hm.iterate(&it) {
+            player_data, is_player := ent.data.(Player_Data)
+            if is_player && player_data.type == next_player_type.? {
+                g_world.active_player = handle
+                break
+            }
         }
     }
 
     k2.clear(k2.BLACK)
-	k2.set_camera(camera)
+	k2.set_camera(g_world.camera)
     draw_world()
     k2.present()
 
@@ -172,6 +193,15 @@ draw_world :: proc() {
     for ent, handle in hm.iterate(&it) {
         switch data in ent.data {
             case Player_Data:
+                if g_world.time_since_player_switch < 1.0 && handle == g_world.active_player {
+                    //TODO: Draw above the walls
+                    k2.draw_texture_rect(
+                        g_textures[.CHARACTERS], 
+                        {x = 160, y = 0, w = 16, h = 16},
+                        ent.sprite_pos + {16, math.sin(g_world.time_since_player_switch * 4.0) * 2},
+                        { 8, 16 },
+                    )
+                }
                 k2.draw_texture_rect(
                     g_textures[.CHARACTERS], 
                     Player_Rects[data.type],
