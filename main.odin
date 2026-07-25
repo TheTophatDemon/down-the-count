@@ -126,6 +126,7 @@ step :: proc() -> bool {
 	delta_time := k2.get_frame_time()
 
     g_world.time_since_player_switch += delta_time
+    active_player_type: Player_Type
     next_player_type: Maybe(Player_Type)
 
     // Update entities
@@ -134,6 +135,7 @@ step :: proc() -> bool {
         if handle == g_world.active_player {
             player_data, is_player := ent.data.(Player_Data)
             assert(is_player)
+            active_player_type = player_data.type
             update_player(ent, delta_time)
 
             if k2.key_went_down(.E) || k2.key_went_down(.Period) {
@@ -164,7 +166,14 @@ step :: proc() -> bool {
 
     k2.clear(k2.BLACK)
 	k2.set_camera(g_world.camera)
+    
     draw_world()
+
+    k2.set_camera(k2.Camera{
+        zoom = 2,
+    })
+    draw_hud(active_player_type)
+
     k2.present()
 
     free_all(context.temp_allocator)
@@ -208,7 +217,7 @@ draw_world :: proc() {
         if .VISIBLE not_in ent.flags do continue
         switch data in ent.data {
             case Player_Data: {
-                if g_world.time_since_player_switch < 1.0 && handle == g_world.active_player {
+                if handle == g_world.active_player && g_world.time_since_player_switch < 1.0 {
                     draw_arrow_at = ent.sprite_pos + {16, math.sin(g_world.time_since_player_switch * 4.0) * 2}
                 }
                 k2.draw_texture_rect(
@@ -279,6 +288,30 @@ draw_world :: proc() {
             pos,
             { 8, 16 },
         )
+    }
+}
+
+draw_hud :: proc(active_player_type: Player_Type) {
+    // Draw inventory
+    for handle, i in g_world.inventories[active_player_type] {
+        // Draw slot background
+        slot_pos := [2]f32{ 4, 4 + f32(i * 32) }
+        k2.draw_texture_rect(g_textures[.ITEMS], { 32, 16, 32, 32 }, slot_pos)
+
+        if item_ent, present := hm.static_get(&g_world.ents, handle); present {
+            #partial switch data in item_ent.data {
+                case Key_Data: {
+                    rect: k2.Rect = { x = 0, w = 32, h = 32 }
+                    switch data.name {
+                        case "MUJI": rect.y = 16
+                        case "PANT": rect.y = 48
+                        case "POLE": rect.y = 80
+                        case "BORO": rect.y = 112
+                    }
+                    k2.draw_texture_rect(g_textures[.ITEMS], rect, slot_pos)
+                }
+            }
+        }
     }
 }
 

@@ -1,0 +1,9 @@
+- Undo and redo?
+- Dialog
+- 9mm item
+- Door with 4 pressure plates
+- Ending
+- Boromi ability: Walk through bars
+- Polenta ability: Jump over gaps
+- Panettone ability: Push blocks
+- Muji ability: Turn into other people

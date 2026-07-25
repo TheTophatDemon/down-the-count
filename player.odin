@@ -24,17 +24,19 @@ Player_Data :: struct {
     type: Player_Type,
 }
 
-player_add_inventory :: proc(player: Entity, item_handle: Entity_Handle) {
+player_add_inventory :: proc(player: Entity, item_handle: Entity_Handle) -> bool {
 	data, is_player := player.data.(Player_Data)
 	if !is_player {
 		log.errorf("tried to add inventory to non-player entity of type %v", player.data)
-		return
+		return false
 	}
 	for handle, i in g_world.inventories[data.type] {
 		if !hm.is_valid(g_world.ents, handle) {
 			g_world.inventories[data.type][i] = item_handle
+			return true
 		}
 	}
+	return false
 }
 
 player_remove_inventory :: proc(player: Entity, index: int) {
@@ -119,9 +121,10 @@ update_player :: proc(player: ^Entity, delta_time: f32) {
 				movement_blocked = true
 			}
 			case Key_Data: {
-				other_ent.flags -= { .VISIBLE, .INTERACTABLE }
-				player_add_inventory(player^, other_handle)
-				k2.play_sound(g_sounds[.KEY])
+				if player_add_inventory(player^, other_handle) {
+					other_ent.flags -= { .VISIBLE, .INTERACTABLE }
+					k2.play_sound(g_sounds[.KEY])
+				}
 			}
 		}
 	}
