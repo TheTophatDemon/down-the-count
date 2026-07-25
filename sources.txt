@@ -3,3 +3,5 @@ key https://freesound.org/people/160033/sounds/366186/
 locked https://freesound.org/people/dj997/sounds/485649/
 unlock https://freesound.org/people/cemagar/sounds/120337/
 switch, unswitch https://freesound.org/people/EricsSoundschmiede/sounds/457410/
+push https://freesound.org/people/Mafon2/sounds/349913/
+poof https://freesound.org/people/saangosu/sounds/815438/

@@ -1,5 +1,4 @@
 - Boromi ability: Walk through bars
 - Polenta ability: Jump over gaps
-- Muji ability: Turn into other people
 - 9mm item
 - Ending

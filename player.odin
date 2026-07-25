@@ -22,8 +22,18 @@ Player_Rects := [Player_Type]k2.Rect{
     .BOROMI = { x = 96, y = 0, w = TILE_SIZE, h = TILE_SIZE },
 }
 
+@rodata
+Muji_Disguise_Rects := [Player_Type]k2.Rect{
+	.MUJI = { x = 0, y = 0, w = TILE_SIZE, h = TILE_SIZE },
+	.PANETTONE = { x = 0, y = 32, w = TILE_SIZE, h = TILE_SIZE },
+    .POLENTA = { x = 0, y = 64, w = TILE_SIZE, h = TILE_SIZE },
+    .BOROMI = { x = 0, y = 96, w = TILE_SIZE, h = TILE_SIZE },
+}
+
 Player_Data :: struct {
     type: Player_Type,
+	active_type: Player_Type, // The type that determines player abilities. This allows Muji to act like other player types.
+	active_timer: int, // Number of turns before active type resets.
 }
 
 player_add_inventory :: proc(player: Entity, item_handle: Entity_Handle) -> bool {
@@ -51,7 +61,6 @@ player_remove_inventory :: proc(player: Entity, index: int) {
 
 update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f32) -> (step_time: bool) {
 	assert(player != nil && player_data != nil)
-	player_type := player_data.type
 
 	MOVE_INTERVAL :: 0.25
 	@(static) move_timer: f32
@@ -93,7 +102,7 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 			case Door_Data: {
 				step_time = true
 				// Check for key possession
-				for item_handle, item_index in g_world.inventories[player_type] {
+				for item_handle, item_index in g_world.inventories[player_data.type] {
 					item_ent, exists := hm.static_get(&g_world.ents, item_handle)
 					if !exists do continue
 					if slice.any_of(data.inputs_needed[:], item_ent.name) {
@@ -110,10 +119,16 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 			}
 			case Player_Data: {
 				movement_blocked = true
+				if player_data.type == .MUJI {
+					player_data.active_type = data.type
+					player_data.active_timer = 20
+					k2.play_sound(g_sounds[.POOF])
+					spawn_smoke(player.pos)
+				}
 			}
 			case Furniture_Data: {
 				movement_blocked = true
-				if player_type == .PANETTONE {
+				if player_data.active_type == .PANETTONE {
 					push_to := other_ent.pos + movement
 					if wall_at(push_to) == 0 {
 						blocking_it := hm.iterator_make(&g_world.ents)
@@ -122,6 +137,9 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 							other_ent.pos = push_to
 							step_time = true
 							movement_blocked = false
+							k2.set_sound_pitch(g_sounds[.PUSH], rand.float32_range(0.75, 1.25))
+							k2.set_sound_volume(g_sounds[.PUSH], rand.float32_range(0.7, 1.0))
+							k2.play_sound(g_sounds[.PUSH])
 						}
 					} 
 				}
@@ -139,6 +157,16 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 
 	if player.pos != dest && !movement_blocked && wall_at(dest) == 0 {
 		step_time = true
+		if player_data.active_type != player_data.type {
+			player_data.active_timer -= 1
+			if player_data.active_timer <= 0  {
+				player_data.active_timer = 0
+				player_data.active_type = player_data.type
+				k2.play_sound(g_sounds[.POOF])
+				spawn_smoke(player.pos)
+			}
+			spawn_counter(player.handle, player_data.active_timer)
+		}
 		player.pos = dest
 		footstep := g_sounds[.FOOTSTEP]
 		k2.set_sound_pitch(footstep, rand.float32_range(0.75, 1.25))

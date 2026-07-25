@@ -53,7 +53,6 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 			zoom = 2.0,
 			offset = { WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 },
 		},
-		time_since_player_switch = 0,
 		time_since_dialog = 10.0,
 	}
 	mem.arena_init(&g_world.arena, g_world_memory)
@@ -110,21 +109,25 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 					case "Muji": {
 						ent.data = Player_Data{
 							type = .MUJI,
+							active_type = .MUJI,
 						}
 					}
 					case "Panettone": {
 						ent.data = Player_Data{
 							type = .PANETTONE,
+							active_type = .PANETTONE,
 						}
 					}
 					case "Polenta": {
 						ent.data = Player_Data{
 							type = .POLENTA,
+							active_type = .POLENTA,
 						}
 					}
 					case "Boromi": {
 						ent.data = Player_Data{
 							type = .BOROMI,
+							active_type = .BOROMI,
 						}
 					}
 					case "Door": {

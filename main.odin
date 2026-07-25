@@ -60,7 +60,7 @@ g_world := struct{
     floor_cols, floor_rows: int,
     floors: [dynamic]int,
     camera: k2.Camera,
-    time_since_player_switch: f32,
+    time_since_start: f32,
     time_since_last_step: f32,
     time_since_dialog: f32,
     time_since_dialog_character: f32,
@@ -68,6 +68,7 @@ g_world := struct{
     dialog_arena: mem.Arena,
     dialog_shown_length: int,
     dialog_shown_line: string,
+    effects: hm.Static_Handle_Map(32, Effect_Data, Effect_Handle),
 }{}
 
 main :: proc() {
@@ -116,10 +117,16 @@ step :: proc() -> bool {
     }
 
     delta_time := k2.get_frame_time()
-    g_world.time_since_player_switch += delta_time
+    g_world.time_since_start += delta_time
     g_world.time_since_last_step += delta_time
     g_world.time_since_dialog += delta_time
     g_world.time_since_dialog_character += delta_time
+
+    // Update effects
+    it := hm.iterator_make(&g_world.effects)
+    for effect, _ in hm.iterate(&it) {
+        update_effect(effect, delta_time)
+    }
 
     if len(g_world.dialog) != 0 {
         // Advance dialog when pressing a key
@@ -176,12 +183,12 @@ step :: proc() -> bool {
 
         // Change player
         if next_player_type != nil {
-            g_world.time_since_player_switch = 0.0
             it = hm.iterator_make(&g_world.ents)
             for ent, handle in hm.iterate(&it) {
                 player_data, is_player := ent.data.(Player_Data)
                 if is_player && player_data.type == next_player_type.? {
                     g_world.active_player = handle
+                    spawn_arrow(handle)
                     break
                 }
             }
@@ -340,15 +347,20 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
             case Player_Data: {
                 if ent.handle == g_world.active_player {
                     active_player_type = data.type
-                    if g_world.time_since_player_switch < 1.0 {
-                        draw_arrow_at = sprite_pos + {16, math.sin(g_world.time_since_player_switch * 4.0) * 2}
-                    }
                 }
-                k2.draw_texture_rect(
-                    g_textures[.CHARACTERS], 
-                    Player_Rects[data.type],
-                    sprite_pos, 
-                )
+                if data.type == .MUJI && data.active_type != .MUJI {
+                    k2.draw_texture_rect(
+                        g_textures[.CHARACTERS], 
+                        Muji_Disguise_Rects[data.active_type],
+                        sprite_pos, 
+                    )
+                } else {
+                    k2.draw_texture_rect(
+                        g_textures[.CHARACTERS], 
+                        Player_Rects[data.type],
+                        sprite_pos, 
+                    )
+                }
             }
             case Door_Data: {
                 src := k2.Rect{
@@ -373,7 +385,7 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
                 k2.draw_texture_rect(
                     g_textures[.ITEMS],
                     { x = 0, y = 0, w = 16, h = 16 },
-                    sprite_pos + { 0, math.sin(g_world.time_since_player_switch * 4.0) * 2 },
+                    sprite_pos + { 0, math.sin(g_world.time_since_start * 4.0) * 2 },
                     { -8, -8 },
                 )
             }
@@ -425,6 +437,14 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
                     }
                 )
             }
+        }
+    }
+
+    // Draw effects
+    {
+        it := hm.iterator_make(&g_world.effects)
+        for effect, _ in hm.iterate(&it) {
+            draw_effect(effect^)
         }
     }
 
