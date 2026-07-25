@@ -1,5 +1,8 @@
 package main
 
+import "core:fmt"
+import "core:slice"
+import "core:strings"
 import "core:log"
 import "core:encoding/json"
 import "core:strconv"
@@ -59,6 +62,7 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 	
 	level: Ogmo_Map
 	json.unmarshal(level_bytes, &level) or_return
+	// Spawn walls and floors first
 	for layer in level.layers {
 		switch layer.name {
 			case "Walls": {
@@ -83,54 +87,87 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 					g_world.floors[i] = layer.tile_data[i]
 				}
 			}
-			case "Entities": {
-				highest_turn := 0
-				for ogmo_ent in layer.entities {
-					ent := Entity{
-						pos = { int(ogmo_ent.x / TILE_SIZE), int(ogmo_ent.y / TILE_SIZE) },
-						flags = { .VISIBLE, .INTERACTABLE },
+		}
+	}
+
+	// Spawn entities after walls have been established
+	for layer in level.layers {
+		if layer.name == "Entities" {
+			highest_turn := 0
+			for ogmo_ent in layer.entities {
+				ent := Entity{
+					pos = { int(ogmo_ent.x / TILE_SIZE), int(ogmo_ent.y / TILE_SIZE) },
+					flags = { .VISIBLE, .INTERACTABLE },
+					size = [2]int{1, 1},
+				}
+				if len(ogmo_ent.values.name) != 0 {
+					ent.name = ogmo_ent.values.name
+				} else {
+					ent.name = fmt.aprintf("%v", ogmo_ent.id)
+				}
+				sprite_pos := cast([2]f32)(ent.pos * TILE_SIZE)
+				switch ogmo_ent.name {
+					case "Muji": {
+						ent.data = Player_Data{
+							type = .MUJI,
+						}
 					}
-					sprite_pos := cast([2]f32)(ent.pos * TILE_SIZE)
-					switch ogmo_ent.name {
-						case "Muji":
-							ent.data = Player_Data{
-								type = .MUJI,
-							}
-						case "Panettone":
-							ent.data = Player_Data{
-								type = .PANETTONE,
-							}
-						case "Polenta":
-							ent.data = Player_Data{
-								type = .POLENTA,
-							}
-						case "Boromi":
-							ent.data = Player_Data{
-								type = .BOROMI,
-							}
-						case "Door":
-							ent.data = Door_Data{
-								key_needed = ogmo_ent.values.key,
-								message = ogmo_ent.values.message,
-							}
-						case "Key":
-							ent.data = Key_Data{
-								name = ogmo_ent.values.name,
-								title = ogmo_ent.values.title,
-							}
+					case "Panettone": {
+						ent.data = Player_Data{
+							type = .PANETTONE,
+						}
 					}
-					new_handle, ok := hm.static_add(&g_world.ents, ent)
-					if !ok {
-						log.error("ran out of entities!")
-						break
+					case "Polenta": {
+						ent.data = Player_Data{
+							type = .POLENTA,
+						}
 					}
-					if turn := ogmo_ent.values.turn; turn > highest_turn {
-						highest_turn = turn
-						g_world.active_player = new_handle
-						g_world.camera.target = sprite_pos
+					case "Boromi": {
+						ent.data = Player_Data{
+							type = .BOROMI,
+						}
+					}
+					case "Door": {
+						data := Door_Data{
+							message = ogmo_ent.values.message,
+						}
+						keys := ogmo_ent.values.key
+						for name in strings.split_iterator(&keys, ",") {
+							if len(data.inputs_needed) == cap(data.inputs_needed) {
+								log.warnf("Too many key names given for door: %v", ogmo_ent.values.key)
+								break
+							}
+							append(&data.inputs_needed, name)
+						}
+						if wall_at(ent.pos + { -1, 0 }) > 0 && wall_at(ent.pos + { 1, 0 }) == 0 && wall_at(ent.pos + { 2, 0 }) == 0 {
+							// Turn into a big door if there's enough space.
+							ent.size = [2]int{3, 1}
+						}
+						ent.data = data
+					}
+					case "Key": {
+						ent.data = Key_Data{
+							title = ogmo_ent.values.title,
+						}
+					}
+					case "Plate": {
+						ent.data = Plate_Data{
+							pressed = false,
+						}
 					}
 				}
+				new_handle, ok := hm.static_add(&g_world.ents, ent)
+				if !ok {
+					log.error("ran out of entities!")
+					break
+				}
+				if turn := ogmo_ent.values.turn; turn > highest_turn {
+					highest_turn = turn
+					g_world.active_player = new_handle
+					g_world.camera.target = sprite_pos
+				}
 			}
+			break
 		}
 	}
 
@@ -167,11 +204,43 @@ Wall_Rects := [16]k2.Rect{
 }
 
 Door_Data :: struct {
-	key_needed: string,
+	inputs_needed: [dynamic; 4]string,
+	inputs_fulfulled: int,
 	message: string,
 }
 
+update_door :: proc(door: ^Entity, door_data: ^Door_Data) {
+	door_data.inputs_fulfulled = 0
+	it := hm.iterator_make(&g_world.ents)
+	for ent, handle in hm.iterate(&it) {
+		plate_data, is_plate := ent.data.(Plate_Data)
+		if is_plate && plate_data.pressed && slice.any_of(door_data.inputs_needed[:], ent.name) {
+			door_data.inputs_fulfulled += 1
+		}
+	}
+}
+
 Key_Data :: struct {
-	name: string,
 	title: string,
+}
+
+Plate_Data :: struct {
+	pressed: bool,
+}
+
+update_plate :: proc(plate: ^Entity, plate_data: ^Plate_Data) {
+	it := hm.iterator_make(&g_world.ents)
+	previously_pressed := plate_data.pressed
+	plate_data.pressed = false
+	for ent, handle in hm.iterate(&it) {
+		if handle != plate.handle && ent.pos == plate.pos {
+			plate_data.pressed = true
+			break
+		}
+	}
+	if plate_data.pressed && !previously_pressed {
+		k2.play_sound(g_sounds[.SWITCH])
+	} else if !plate_data.pressed && previously_pressed {
+		k2.play_sound(g_sounds[.UNSWITCH])
+	}
 }

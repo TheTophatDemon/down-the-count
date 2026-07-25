@@ -1,7 +1,6 @@
-- 9mm item
-- Door with 4 pressure plates
-- Ending
+- Panettone ability: Push blocks
 - Boromi ability: Walk through bars
 - Polenta ability: Jump over gaps
-- Panettone ability: Push blocks
 - Muji ability: Turn into other people
+- 9mm item
+- Ending

@@ -1,5 +1,6 @@
 package main
 
+import "core:slice"
 import "core:log"
 import "core:math/rand"
 import "core:fmt"
@@ -31,13 +32,7 @@ player_add_inventory :: proc(player: Entity, item_handle: Entity_Handle) -> bool
 		log.errorf("tried to add inventory to non-player entity of type %v", player.data)
 		return false
 	}
-	for handle, i in g_world.inventories[data.type] {
-		if !hm.is_valid(g_world.ents, handle) {
-			g_world.inventories[data.type][i] = item_handle
-			return true
-		}
-	}
-	return false
+	return append(&g_world.inventories[data.type], item_handle) != 0
 }
 
 player_remove_inventory :: proc(player: Entity, index: int) {
@@ -51,12 +46,7 @@ player_remove_inventory :: proc(player: Entity, index: int) {
 		log.errorf("attempted to remove inventory at index %v", index)
 		return
 	}
-	if index < inventory_size - 1 {
-		// Shift items left by 1
-		copy(g_world.inventories[data.type][index:], g_world.inventories[data.type][index+1:])
-	}
-	// Clear the last item
-	g_world.inventories[data.type][inventory_size - 1] = {}
+	ordered_remove(&g_world.inventories[data.type], index)
 }
 
 update_player :: proc(player: ^Entity, delta_time: f32) -> (step_time: bool) {
@@ -99,8 +89,13 @@ update_player :: proc(player: ^Entity, delta_time: f32) -> (step_time: bool) {
 	// Interact with entities being hit
 	it := hm.iterator_make(&g_world.ents)
 	for other_ent, other_handle in hm.iterate(&it) {
-		if other_handle == player.handle || other_ent.pos != dest do continue
-		if .INTERACTABLE not_in other_ent.flags do continue
+		if other_handle == player.handle ||
+			dest.x < other_ent.pos.x || dest.x >= other_ent.pos.x + other_ent.size.x ||
+			dest.y < other_ent.pos.y || dest.y >= other_ent.pos.y + other_ent.size.y ||
+			.INTERACTABLE not_in other_ent.flags 
+		{
+			continue
+		}
 		data_switch: #partial switch &data in other_ent.data {
 			case Door_Data: {
 				step_time = true
@@ -108,9 +103,7 @@ update_player :: proc(player: ^Entity, delta_time: f32) -> (step_time: bool) {
 				for item_handle, item_index in g_world.inventories[player_type] {
 					item_ent, exists := hm.static_get(&g_world.ents, item_handle)
 					if !exists do continue
-					key, is_key := item_ent.data.(Key_Data)
-					if !is_key do continue
-					if key.name == data.key_needed {
+					if slice.any_of(data.inputs_needed[:], item_ent.name) {
 						player_remove_inventory(player^, item_index)
 						hm.static_remove(&g_world.ents, other_handle)
 						k2.play_sound(g_sounds[.UNLOCK])
@@ -141,7 +134,7 @@ update_player :: proc(player: ^Entity, delta_time: f32) -> (step_time: bool) {
 		player.pos = dest
 		footstep := g_sounds[.FOOTSTEP]
 		k2.set_sound_pitch(footstep, rand.float32_range(0.75, 1.25))
-		k2.set_sound_volume(footstep, rand.float32_range(0.5, 1.5))
+		k2.set_sound_volume(footstep, rand.float32_range(0.4, 0.8))
 		k2.play_sound(footstep)
 	}
 	return

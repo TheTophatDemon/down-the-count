@@ -16,6 +16,8 @@ Sound_Key :: enum {
 	LOCKED,
 	UNLOCK,
 	TYPE,
+	SWITCH,
+	UNSWITCH,
 }
 
 g_sounds := [Sound_Key]k2.Sound{}
@@ -29,6 +31,8 @@ load_assets :: proc() {
 	g_sounds[.LOCKED] = k2.load_sound_from_bytes(#load("assets/locked.wav"))
 	g_sounds[.UNLOCK] = k2.load_sound_from_bytes(#load("assets/unlock.wav"))
 	g_sounds[.TYPE] = k2.load_sound_from_bytes(#load("assets/type.wav"))
+	g_sounds[.SWITCH] = k2.load_sound_from_bytes(#load("assets/switch.wav"))
+	g_sounds[.UNSWITCH] = k2.load_sound_from_bytes(#load("assets/unswitch.wav"))
 }
 
 unload_assets :: proc() {

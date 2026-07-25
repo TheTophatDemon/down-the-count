@@ -1,5 +1,6 @@
 package main
 
+import "core:slice"
 import "core:math/rand"
 import "core:strings"
 import "core:log"
@@ -21,6 +22,7 @@ Entity_Data :: union {
     Player_Data,
     Door_Data,
     Key_Data,
+    Plate_Data,
 }
 
 Entity_Flag :: enum {
@@ -33,14 +35,16 @@ Entity_Flags :: bit_set[Entity_Flag]
 Entity :: struct {
     handle: Entity_Handle,
     pos: [2]int, // Grid position, in terms of row / column
+    size: [2]int, // Hitbox size in grid coordinates
     flags: Entity_Flags,
     data: Entity_Data,
+    name: string,
 }
 
 Time_Step :: struct {
     ents: hm.Static_Handle_Map(128, Entity, Entity_Handle),
     active_player: Entity_Handle,
-    inventories: [Player_Type][4]Entity_Handle,
+    inventories: [Player_Type][dynamic; 4]Entity_Handle,
 }
 
 g_previous_time_steps: [dynamic; 32]Time_Step
@@ -161,6 +165,11 @@ step :: proc() -> bool {
                 } 
 
                 g_world.camera.target += (cast([2]f32)(ent.pos * TILE_SIZE) + { TILE_SIZE / 2, TILE_SIZE / 2 } - g_world.camera.target) * 0.5            
+                continue
+            }
+            #partial switch &data in ent.data {
+                case Door_Data: update_door(ent, &data)
+                case Plate_Data: update_plate(ent, &data)
             }
         }
 
@@ -259,10 +268,40 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
 
     // Draw entities
     draw_arrow_at: Maybe([2]f32)
+
+    sorted_entities, err := make([dynamic]^Entity, 0, hm.static_len(g_world.ents), context.temp_allocator)
+    if err != nil {
+        log.errorf("Could not allocate sorted entities for rendering, %v", err)
+        return
+    }
+
     it := hm.iterator_make(&g_world.ents)
     for ent, handle in hm.iterate(&it) {
         if .VISIBLE not_in ent.flags do continue
+        append(&sorted_entities, ent)
+    }
 
+    // Returns the drawing order of the entity based on its type.
+    entity_priority :: proc(ent: Entity) -> int {
+        switch _ in ent.data {
+            case Player_Data: return 5
+            case Door_Data: return 4
+            case Key_Data: return 3
+            case Plate_Data: return 2
+        }
+        return 0
+    }
+
+    slice.sort_by(sorted_entities[:], proc(a, b: ^Entity) -> bool {
+        if a == nil || b == nil do return false
+        diff := entity_priority(a^) - entity_priority(b^)
+        if diff == 0 {
+            return a.handle.idx < b.handle.idx
+        }
+        return diff < 0
+    })
+
+    for ent in sorted_entities {
         // Smoothly animate the position from one step to the next
         // target_sprite_pos := cast([2]f32)(ent.pos * TILE_SIZE)
         // previous_sprite_pos := target_sprite_pos
@@ -278,7 +317,7 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
 
         switch data in ent.data {
             case Player_Data: {
-                if handle == g_world.active_player {
+                if ent.handle == g_world.active_player {
                     active_player_type = data.type
                     if g_world.time_since_player_switch < 1.0 {
                         draw_arrow_at = sprite_pos + {16, math.sin(g_world.time_since_player_switch * 4.0) * 2}
@@ -295,7 +334,12 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
                     x = 192, y = 0,
                     w = TILE_SIZE, h = TILE_SIZE,
                 }
-                if wall_at(ent.pos + { -1, 0 }) > 0 || wall_at(ent.pos + { 1, 0 }) > 0 {
+                if ent.size.x > 1 {
+                    // Big door
+                    src.x = 160
+                    src.y = 64 + f32(TILE_SIZE * data.inputs_fulfulled)
+                    src.w = TILE_SIZE * 3
+                } else if wall_at(ent.pos + { -1, 0 }) > 0 && wall_at(ent.pos + { 1, 0 }) > 0 {
                     src.x += TILE_SIZE
                 }
                 k2.draw_texture_rect(
@@ -310,6 +354,18 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
                     { x = 0, y = 0, w = 16, h = 16 },
                     sprite_pos + { 0, math.sin(g_world.time_since_player_switch * 4.0) * 2 },
                     { -8, -8 },
+                )
+            }
+            case Plate_Data: {
+                k2.draw_texture_rect(
+                    g_textures[.TILES],
+                    {
+                        x = 64 if !data.pressed else 96,
+                        y = 96,
+                        w = TILE_SIZE,
+                        h = TILE_SIZE,
+                    },
+                    sprite_pos
                 )
             }
         }
@@ -368,7 +424,7 @@ draw_hud :: proc(active_player_type: Player_Type) {
             #partial switch data in item_ent.data {
                 case Key_Data: {
                     rect: k2.Rect = { x = 0, w = 32, h = 32 }
-                    switch data.name {
+                    switch item_ent.name {
                         case "MUJI": rect.y = 16
                         case "PANT": rect.y = 48
                         case "POLE": rect.y = 80
