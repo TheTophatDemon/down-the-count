@@ -12,6 +12,9 @@ g_textures := [Texture_Key]k2.Texture{}
 
 Sound_Key :: enum {
 	FOOTSTEP,
+	KEY,
+	LOCKED,
+	UNLOCK,
 }
 
 g_sounds := [Sound_Key]k2.Sound{}
@@ -21,6 +24,9 @@ load_assets :: proc() {
 	g_textures[.CHARACTERS] = k2.load_texture_from_bytes(#load("assets/characters.png"))
 	g_textures[.ITEMS] = k2.load_texture_from_bytes(#load("assets/items.png"))
 	g_sounds[.FOOTSTEP] = k2.load_sound_from_bytes(#load("assets/footstep.wav"))
+	g_sounds[.KEY] = k2.load_sound_from_bytes(#load("assets/key.wav"))
+	g_sounds[.LOCKED] = k2.load_sound_from_bytes(#load("assets/locked.wav"))
+	g_sounds[.UNLOCK] = k2.load_sound_from_bytes(#load("assets/unlock.wav"))
 }
 
 unload_assets :: proc() {

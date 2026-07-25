@@ -13,13 +13,25 @@ TILE_SIZE :: 32
 
 Entity_Handle :: hm.Handle32
 
+Entity_Data :: union {
+    Player_Data,
+    Door_Data,
+    Key_Data,
+}
+
+Entity_Flag :: enum {
+    VISIBLE,
+    INTERACTABLE,
+}
+
+Entity_Flags :: bit_set[Entity_Flag]
+
 Entity :: struct {
     handle: Entity_Handle,
-    pos: [2]int,
-    sprite_pos: [2]f32,
-    data: union {
-        Player_Data,
-    }
+    pos: [2]int, // Grid position, in terms of row / column
+    sprite_pos: [2]f32, // Position of the sprite on screen in pixels. 
+    flags: Entity_Flags,
+    data: Entity_Data,
 }
 
 Wall_Neighbor :: enum {
@@ -63,6 +75,7 @@ g_world := struct{
     time_since_player_switch: f32,
     ents: hm.Static_Handle_Map(512, Entity, Entity_Handle),
     active_player: Entity_Handle,
+    inventories: [Player_Type][4]Entity_Handle,
 }{}
 
 main :: proc() {
@@ -189,24 +202,43 @@ draw_world :: proc() {
     }
 
     // Draw entities
+    draw_arrow_at: Maybe([2]f32)
     it := hm.iterator_make(&g_world.ents)
     for ent, handle in hm.iterate(&it) {
+        if .VISIBLE not_in ent.flags do continue
         switch data in ent.data {
-            case Player_Data:
+            case Player_Data: {
                 if g_world.time_since_player_switch < 1.0 && handle == g_world.active_player {
-                    //TODO: Draw above the walls
-                    k2.draw_texture_rect(
-                        g_textures[.CHARACTERS], 
-                        {x = 160, y = 0, w = 16, h = 16},
-                        ent.sprite_pos + {16, math.sin(g_world.time_since_player_switch * 4.0) * 2},
-                        { 8, 16 },
-                    )
+                    draw_arrow_at = ent.sprite_pos + {16, math.sin(g_world.time_since_player_switch * 4.0) * 2}
                 }
                 k2.draw_texture_rect(
                     g_textures[.CHARACTERS], 
                     Player_Rects[data.type],
                     ent.sprite_pos, 
                 )
+            }
+            case Door_Data: {
+                src := k2.Rect{
+                    x = 192, y = 0,
+                    w = TILE_SIZE, h = TILE_SIZE,
+                }
+                if wall_at(ent.pos + { -1, 0 }) > 0 || wall_at(ent.pos + { 1, 0 }) > 0 {
+                    src.x += TILE_SIZE
+                }
+                k2.draw_texture_rect(
+                    g_textures[.TILES],
+                    src,
+                    ent.sprite_pos,
+                )
+            }
+            case Key_Data: {
+                k2.draw_texture_rect(
+                    g_textures[.ITEMS],
+                    { x = 0, y = 0, w = 16, h = 16 },
+                    ent.sprite_pos + { 0, math.sin(g_world.time_since_player_switch * 4.0) * 2 },
+                    { -8, -8 },
+                )
+            }
         }
     }
 
@@ -237,6 +269,16 @@ draw_world :: proc() {
                 )
             }
         }
+    }
+
+    // Draw selection arrow
+    if pos, ok := draw_arrow_at.([2]f32); ok {
+        k2.draw_texture_rect(
+            g_textures[.CHARACTERS], 
+            {x = 160, y = 0, w = 16, h = 16},
+            pos,
+            { 8, 16 },
+        )
     }
 }
 

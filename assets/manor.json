@@ -23,7 +23,7 @@
           "y": 192,
           "originX": 0,
           "originY": 0,
-          "values": {"key": "Muji's Cell"}
+          "values": {"key": "MUJI"}
         },
         {
           "name": "Muji",
@@ -36,14 +36,14 @@
           "values": {"turn": 1}
         },
         {
-          "name": "key",
+          "name": "Key",
           "id": 2,
           "_eid": "76992217",
           "x": 224,
           "y": 128,
           "originX": -8,
           "originY": -8,
-          "values": {"name": "Muji's Cell"}
+          "values": {"name": "MUJI", "title": "Muji's cell"}
         },
         {
           "name": "Panettone",
@@ -63,17 +63,17 @@
           "y": 288,
           "originX": 0,
           "originY": 0,
-          "values": {"key": "Panettone's Cell"}
+          "values": {"key": "PANT"}
         },
         {
-          "name": "key",
+          "name": "Key",
           "id": 5,
           "_eid": "76992217",
           "x": 480,
           "y": 96,
           "originX": -8,
           "originY": -8,
-          "values": {"name": "Panettone's Cell"}
+          "values": {"name": "PANT", "title": "Panettone's Cell"}
         },
         {
           "name": "Polenta",

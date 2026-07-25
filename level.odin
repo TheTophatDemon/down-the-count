@@ -11,6 +11,7 @@ Ogmo_Entity_Values :: struct {
 	key: string,
 	name: string,
 	turn: int,
+	title: string,
 }
 
 Ogmo_Entity :: struct {
@@ -57,7 +58,7 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 	json.unmarshal(level_bytes, &level) or_return
 	for layer in level.layers {
 		switch layer.name {
-			case "Walls":
+			case "Walls": {
 				assert(len(layer.grid) == layer.num_cols * layer.num_rows)
 				g_world.wall_cols = layer.num_cols
 				g_world.wall_rows = layer.num_rows
@@ -69,7 +70,8 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 						log.warnf("grid tile at index %v did not parse correctly", i)
 					}
 				}
-			case "Floors":
+			}
+			case "Floors": {
 				assert(len(layer.tile_data) == layer.num_cols * layer.num_rows)
 				g_world.floor_cols = layer.num_cols
 				g_world.floor_rows = layer.num_rows
@@ -77,11 +79,13 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 				for i in 0..<len(layer.tile_data) {
 					g_world.floors[i] = layer.tile_data[i]
 				}
-			case "Entities":
+			}
+			case "Entities": {
 				highest_turn := 0
 				for ogmo_ent in layer.entities {
 					ent := Entity{
 						pos = { int(ogmo_ent.x / TILE_SIZE), int(ogmo_ent.y / TILE_SIZE) },
+						flags = { .VISIBLE, .INTERACTABLE },
 					}
 					ent.sprite_pos = cast([2]f32)(ent.pos * TILE_SIZE)
 					switch ogmo_ent.name {
@@ -101,6 +105,15 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 							ent.data = Player_Data{
 								type = .BOROMI,
 							}
+						case "Door":
+							ent.data = Door_Data{
+								key_needed = ogmo_ent.values.key,
+							}
+						case "Key":
+							ent.data = Key_Data{
+								name = ogmo_ent.values.name,
+								title = ogmo_ent.values.title,
+							}
 					}
 					new_handle, ok := hm.static_add(&g_world.ents, ent)
 					if !ok {
@@ -113,8 +126,18 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 						g_world.camera.target = ent.sprite_pos
 					}
 				}
+			}
 		}
 	}
 
 	return nil
+}
+
+Door_Data :: struct {
+	key_needed: string,
+}
+
+Key_Data :: struct {
+	name: string,
+	title: string,
 }
