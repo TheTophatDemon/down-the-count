@@ -155,7 +155,8 @@
       "nodeGhost": true,
       "tags": [],
       "values": [
-        {"name": "key", "definition": "String", "display": 1, "defaults": "", "maxLength": 0, "trimWhitespace": true}
+        {"name": "key", "definition": "String", "display": 1, "defaults": "", "maxLength": 0, "trimWhitespace": true},
+        {"name": "message", "definition": "Text", "display": 0, "defaults": ""}
       ]
     },
     {

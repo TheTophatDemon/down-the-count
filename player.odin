@@ -2,6 +2,7 @@ package main
 
 import "core:log"
 import "core:math/rand"
+import "core:fmt"
 import hm "core:container/handle_map"
 import k2 "karl2d"
 
@@ -117,6 +118,7 @@ update_player :: proc(player: ^Entity, delta_time: f32) -> (step_time: bool) {
 						break data_switch
 					}
 				}
+				show_dialog(data.message)
 				movement_blocked = true
 				k2.play_sound(g_sounds[.LOCKED])
 			}
@@ -128,6 +130,7 @@ update_player :: proc(player: ^Entity, delta_time: f32) -> (step_time: bool) {
 					step_time = true
 					other_ent.flags -= { .VISIBLE, .INTERACTABLE }
 					k2.play_sound(g_sounds[.KEY])
+					show_dialog(fmt.tprintf("You got %v.", data.title))
 				}
 			}
 		}

@@ -1,15 +1,18 @@
 package main
 
+import "core:math/rand"
+import "core:strings"
 import "core:log"
 import "core:fmt"
 import "core:mem"
 import "core:math"
-import "core:math/ease"
 import hm "core:container/handle_map"
 import k2 "karl2d"
 
-SCREEN_WIDTH :: 1280
-SCREEN_HEIGHT :: 720
+WINDOW_WIDTH :: 1280
+WINDOW_HEIGHT :: 720
+SCREEN_WIDTH :: WINDOW_WIDTH / 2
+SCREEN_HEIGHT :: WINDOW_HEIGHT / 2
 TILE_SIZE :: 32
 
 Entity_Handle :: hm.Handle32
@@ -54,6 +57,12 @@ g_world := struct{
     camera: k2.Camera,
     time_since_player_switch: f32,
     time_since_last_step: f32,
+    time_since_dialog: f32,
+    time_since_dialog_character: f32,
+    dialog: string,
+    dialog_arena: mem.Arena,
+    dialog_shown_length: int,
+    dialog_shown_line: string,
 }{}
 
 main :: proc() {
@@ -87,7 +96,7 @@ main :: proc() {
 init :: proc() {
     context.logger = log.create_console_logger()
     g_world_memory = make([]u8, 4 * mem.Megabyte)
-	k2.init(SCREEN_WIDTH, SCREEN_HEIGHT, "Down the Count")
+	k2.init(WINDOW_WIDTH, WINDOW_HEIGHT, "Down the Count")
     load_assets()
     err := load_level(#load("assets/manor.json"))
     if err != nil {
@@ -104,20 +113,34 @@ step :: proc() -> bool {
     delta_time := k2.get_frame_time()
     g_world.time_since_player_switch += delta_time
     g_world.time_since_last_step += delta_time
+    g_world.time_since_dialog += delta_time
+    g_world.time_since_dialog_character += delta_time
 
-    previous_time_step, err := new_clone(g_world.time_step)
-    if err != nil {
-        log.errorf("error allocating memory for previous time step: %v", err)
-        return false
-    }
-    defer free(previous_time_step)
-
-    update: {
-        // Undo
-        if (k2.key_went_down(.Z) || k2.key_went_down(.Backspace)) && len(g_previous_time_steps) > 0 {
-            g_world.time_step = pop(&g_previous_time_steps)
-            break update
+    if len(g_world.dialog) != 0 {
+        // Advance dialog when pressing a key
+        if k2.key_went_down(.Z) || k2.key_went_down(.Enter) || k2.key_went_down(.Space) {
+            if g_world.dialog_shown_length != len(g_world.dialog_shown_line) {
+                // Skip to end of line
+                g_world.dialog_shown_length = len(g_world.dialog_shown_line)
+            } else if len(g_world.dialog_shown_line) >= len(g_world.dialog) - 1 {
+                // End dialog
+                show_dialog("")
+            } else {
+                // Go to next line
+                g_world.dialog = g_world.dialog[len(g_world.dialog_shown_line) + 1:]
+                g_world.dialog_shown_line, _, _ = strings.partition(g_world.dialog, "\n")
+                g_world.dialog_shown_length = 0
+            }
         }
+    } else if (k2.key_went_down(.U) || k2.key_went_down(.Backspace)) && len(g_previous_time_steps) > 0 {
+        g_world.time_step = pop(&g_previous_time_steps)
+    } else {
+        previous_time_step, err := new_clone(g_world.time_step)
+        if err != nil {
+            log.errorf("error allocating memory for previous time step: %v", err)
+            return false
+        }
+        defer free(previous_time_step)
 
         step_time := false
 
@@ -186,6 +209,26 @@ wall_at :: proc(pos: [2]int) -> int {
     }
     flat_idx := pos[0] + (pos[1] * g_world.wall_cols)
     return g_world.walls[flat_idx]
+}
+
+// Shows dialog on the screen. The memory for the passed string is copied and managed by the dialog arena.
+show_dialog :: proc(dialog: string) {
+    context.allocator = mem.arena_allocator(&g_world.dialog_arena)
+    if dialog == "" {
+        mem.arena_free_all(&g_world.dialog_arena)
+        g_world.dialog = ""
+    } else {
+        my_dialog, err := strings.clone(dialog)
+        if err != nil {
+            log.errorf("could not allocate memory for dialog: %v", err)
+            return
+        }
+        g_world.dialog = my_dialog
+    }
+        
+    g_world.dialog_shown_length = 0
+    g_world.time_since_dialog = 0.0
+    g_world.dialog_shown_line, _, _ = strings.partition(g_world.dialog, "\n")
 }
 
 draw_world :: proc() -> (active_player_type: Player_Type) {
@@ -335,6 +378,40 @@ draw_hud :: proc(active_player_type: Player_Type) {
                 }
             }
         }
+    }
+
+    // Draw text boxes
+    TRANSITION_TIME :: 0.25
+    CHARACTER_SPEED :: 0.025
+    DIALOG_HEIGHT :: 64
+    if len(g_world.dialog) != 0 {
+        bg_y := SCREEN_HEIGHT - min(g_world.time_since_dialog, TRANSITION_TIME) * (1 / TRANSITION_TIME) * DIALOG_HEIGHT
+        k2.draw_rect(k2.Rect{ x = 0, y = bg_y, w = SCREEN_WIDTH, h = DIALOG_HEIGHT }, k2.BLACK)
+        k2.draw_rect(k2.Rect{ x= 0, y = bg_y + 1, w = SCREEN_WIDTH, h = 1}, k2.WHITE)
+        if g_world.time_since_dialog > TRANSITION_TIME {
+            if g_world.time_since_dialog_character > CHARACTER_SPEED {
+                g_world.time_since_dialog_character = 0.0
+                g_world.dialog_shown_length = min(g_world.dialog_shown_length + 1, len(g_world.dialog_shown_line))
+            }
+            if g_world.dialog_shown_length == len(g_world.dialog_shown_line) {
+                if math.mod(g_world.time_since_dialog, 0.5) > 0.25 {
+                    k2.draw_texture_rect(
+                        g_textures[.CHARACTERS], 
+                        {x = 160, y = 0, w = 16, h = 16}, 
+                        { SCREEN_WIDTH - 16 - 4, SCREEN_HEIGHT - 16 - 4 },
+                    )
+                }
+            } else if !k2.sound_is_playing(g_sounds[.TYPE]) {
+                k2.set_sound_pitch(g_sounds[.TYPE], rand.float32_range(0.9, 1.1))
+                k2.set_sound_volume(g_sounds[.TYPE], rand.float32_range(0.5, 1.5))
+                k2.play_sound(g_sounds[.TYPE])
+            }
+            k2.draw_text(g_world.dialog_shown_line[:g_world.dialog_shown_length], { 4, bg_y + 4 }, 16, k2.WHITE)
+        }
+    } else if g_world.time_since_dialog < TRANSITION_TIME {
+        bg_y := SCREEN_HEIGHT - DIALOG_HEIGHT + min(g_world.time_since_dialog, TRANSITION_TIME) * (1 / TRANSITION_TIME) * DIALOG_HEIGHT
+        k2.draw_rect(k2.Rect{ x = 0, y = bg_y, w = SCREEN_WIDTH, h = DIALOG_HEIGHT }, k2.BLACK)
+        k2.draw_rect(k2.Rect{ x= 0, y = bg_y + 1, w = SCREEN_WIDTH, h = 1}, k2.WHITE)
     }
 }
 

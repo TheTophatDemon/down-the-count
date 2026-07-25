@@ -12,6 +12,7 @@ Ogmo_Entity_Values :: struct {
 	name: string,
 	turn: int,
 	title: string,
+	message: string,
 }
 
 Ogmo_Entity :: struct {
@@ -47,12 +48,14 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 	g_world = {
 		camera = k2.Camera{
 			zoom = 2.0,
-			offset = { SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 },
+			offset = { WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 },
 		},
 		time_since_player_switch = 0,
+		time_since_dialog = 10.0,
 	}
 	mem.arena_init(&g_world.arena, g_world_memory)
 	context.allocator = mem.arena_allocator(&g_world.arena)
+	mem.arena_init(&g_world.dialog_arena, make([]byte, 2 * mem.Kilobyte))
 	
 	level: Ogmo_Map
 	json.unmarshal(level_bytes, &level) or_return
@@ -108,6 +111,7 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 						case "Door":
 							ent.data = Door_Data{
 								key_needed = ogmo_ent.values.key,
+								message = ogmo_ent.values.message,
 							}
 						case "Key":
 							ent.data = Key_Data{
@@ -164,6 +168,7 @@ Wall_Rects := [16]k2.Rect{
 
 Door_Data :: struct {
 	key_needed: string,
+	message: string,
 }
 
 Key_Data :: struct {
