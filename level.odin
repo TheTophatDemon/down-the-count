@@ -87,7 +87,7 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 						pos = { int(ogmo_ent.x / TILE_SIZE), int(ogmo_ent.y / TILE_SIZE) },
 						flags = { .VISIBLE, .INTERACTABLE },
 					}
-					ent.sprite_pos = cast([2]f32)(ent.pos * TILE_SIZE)
+					sprite_pos := cast([2]f32)(ent.pos * TILE_SIZE)
 					switch ogmo_ent.name {
 						case "Muji":
 							ent.data = Player_Data{
@@ -123,7 +123,7 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 					if turn := ogmo_ent.values.turn; turn > highest_turn {
 						highest_turn = turn
 						g_world.active_player = new_handle
-						g_world.camera.target = ent.sprite_pos
+						g_world.camera.target = sprite_pos
 					}
 				}
 			}
@@ -131,6 +131,35 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 	}
 
 	return nil
+}
+
+Wall_Neighbor :: enum {
+    TOP_LEFT,
+    TOP_RIGHT,
+    BOTTOM_RIGHT,
+    BOTTOM_LEFT,
+}
+
+Wall_Neighbors :: bit_set[Wall_Neighbor]
+
+@(rodata)
+Wall_Rects := [16]k2.Rect{
+    0 = { x = 160, y = 0, w = TILE_SIZE, h = TILE_SIZE },
+    1 = { x = 64, y = 64, w = TILE_SIZE, h = TILE_SIZE },
+    2 = { x = 0, y = 64, w = TILE_SIZE, h = TILE_SIZE },
+    3 = { x = 32, y = 64, w = TILE_SIZE, h = TILE_SIZE },
+    4 = { x = 0, y = 0, w = TILE_SIZE, h = TILE_SIZE },
+    5 = { x = 96, y = 0, w = TILE_SIZE, h = TILE_SIZE },
+    6 = { x = 0, y = 32, w = TILE_SIZE, h = TILE_SIZE },
+    7 = { x = 128, y = 32, w = TILE_SIZE, h = TILE_SIZE },
+    8 = { x = 64, y = 0, w = TILE_SIZE, h = TILE_SIZE },
+    9 = { x = 64, y = 32, w = TILE_SIZE, h = TILE_SIZE },
+    10 = { x = 128, y = 0, w = TILE_SIZE, h = TILE_SIZE },
+    11 = { x = 96, y = 32, w = TILE_SIZE, h = TILE_SIZE },
+    12 = { x = 32, y = 0, w = TILE_SIZE, h = TILE_SIZE },
+    13 = { x = 96, y = 64, w = TILE_SIZE, h = TILE_SIZE },
+    14 = { x = 128, y = 64, w = TILE_SIZE, h = TILE_SIZE },
+    15 = { x = 32, y = 32, w = TILE_SIZE, h = TILE_SIZE },
 }
 
 Door_Data :: struct {

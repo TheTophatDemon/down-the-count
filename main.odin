@@ -4,6 +4,7 @@ import "core:log"
 import "core:fmt"
 import "core:mem"
 import "core:math"
+import "core:math/ease"
 import hm "core:container/handle_map"
 import k2 "karl2d"
 
@@ -29,43 +30,22 @@ Entity_Flags :: bit_set[Entity_Flag]
 Entity :: struct {
     handle: Entity_Handle,
     pos: [2]int, // Grid position, in terms of row / column
-    sprite_pos: [2]f32, // Position of the sprite on screen in pixels. 
     flags: Entity_Flags,
     data: Entity_Data,
 }
 
-Wall_Neighbor :: enum {
-    TOP_LEFT,
-    TOP_RIGHT,
-    BOTTOM_RIGHT,
-    BOTTOM_LEFT,
+Time_Step :: struct {
+    ents: hm.Static_Handle_Map(128, Entity, Entity_Handle),
+    active_player: Entity_Handle,
+    inventories: [Player_Type][4]Entity_Handle,
 }
 
-Wall_Neighbors :: bit_set[Wall_Neighbor]
-
-@(rodata)
-Wall_Rects := [16]k2.Rect{
-    0 = { x = 160, y = 0, w = TILE_SIZE, h = TILE_SIZE },
-    1 = { x = 64, y = 64, w = TILE_SIZE, h = TILE_SIZE },
-    2 = { x = 0, y = 64, w = TILE_SIZE, h = TILE_SIZE },
-    3 = { x = 32, y = 64, w = TILE_SIZE, h = TILE_SIZE },
-    4 = { x = 0, y = 0, w = TILE_SIZE, h = TILE_SIZE },
-    5 = { x = 96, y = 0, w = TILE_SIZE, h = TILE_SIZE },
-    6 = { x = 0, y = 32, w = TILE_SIZE, h = TILE_SIZE },
-    7 = { x = 128, y = 32, w = TILE_SIZE, h = TILE_SIZE },
-    8 = { x = 64, y = 0, w = TILE_SIZE, h = TILE_SIZE },
-    9 = { x = 64, y = 32, w = TILE_SIZE, h = TILE_SIZE },
-    10 = { x = 128, y = 0, w = TILE_SIZE, h = TILE_SIZE },
-    11 = { x = 96, y = 32, w = TILE_SIZE, h = TILE_SIZE },
-    12 = { x = 32, y = 0, w = TILE_SIZE, h = TILE_SIZE },
-    13 = { x = 96, y = 64, w = TILE_SIZE, h = TILE_SIZE },
-    14 = { x = 128, y = 64, w = TILE_SIZE, h = TILE_SIZE },
-    15 = { x = 32, y = 32, w = TILE_SIZE, h = TILE_SIZE },
-}
+g_previous_time_steps: [dynamic; 32]Time_Step
 
 g_world_memory: []u8
 
 g_world := struct{
+    using time_step: Time_Step,
     arena: mem.Arena,
     wall_cols, wall_rows: int,
     walls: [dynamic]int,
@@ -73,9 +53,7 @@ g_world := struct{
     floors: [dynamic]int,
     camera: k2.Camera,
     time_since_player_switch: f32,
-    ents: hm.Static_Handle_Map(512, Entity, Entity_Handle),
-    active_player: Entity_Handle,
-    inventories: [Player_Type][4]Entity_Handle,
+    time_since_last_step: f32,
 }{}
 
 main :: proc() {
@@ -123,51 +101,72 @@ step :: proc() -> bool {
         return false
     }
 
-	delta_time := k2.get_frame_time()
-
+    delta_time := k2.get_frame_time()
     g_world.time_since_player_switch += delta_time
-    active_player_type: Player_Type
-    next_player_type: Maybe(Player_Type)
+    g_world.time_since_last_step += delta_time
 
-    // Update entities
-    it := hm.iterator_make(&g_world.ents)
-    for ent, handle in hm.iterate(&it) {
-        if handle == g_world.active_player {
-            player_data, is_player := ent.data.(Player_Data)
-            assert(is_player)
-            active_player_type = player_data.type
-            update_player(ent, delta_time)
-
-            if k2.key_went_down(.E) || k2.key_went_down(.Period) {
-                next_player_type = Player_Type((int(player_data.type) + 1) % len(Player_Type))
-            } else if k2.key_went_down(.Q) || k2.key_went_down(.Comma) {
-                next_player_type = Player_Type((int(player_data.type) + len(Player_Type) - 1) % len(Player_Type))
-            } 
-
-            g_world.camera.target += (ent.sprite_pos - g_world.camera.target) * 0.5            
-        }
-        // Smoothly move sprite to new position.
-        new_sprite_pos := cast([2]f32)(ent.pos * TILE_SIZE)
-        ent.sprite_pos += (new_sprite_pos - ent.sprite_pos) * 0.5
+    previous_time_step, err := new_clone(g_world.time_step)
+    if err != nil {
+        log.errorf("error allocating memory for previous time step: %v", err)
+        return false
     }
+    defer free(previous_time_step)
 
-    // Change player
-    if next_player_type != nil {
-        g_world.time_since_player_switch = 0.0
-        it = hm.iterator_make(&g_world.ents)
+    update: {
+        // Undo
+        if (k2.key_went_down(.Z) || k2.key_went_down(.Backspace)) && len(g_previous_time_steps) > 0 {
+            g_world.time_step = pop(&g_previous_time_steps)
+            break update
+        }
+
+        step_time := false
+
+        next_player_type: Maybe(Player_Type)
+
+        // Update entities
+        it := hm.iterator_make(&g_world.ents)
         for ent, handle in hm.iterate(&it) {
-            player_data, is_player := ent.data.(Player_Data)
-            if is_player && player_data.type == next_player_type.? {
-                g_world.active_player = handle
-                break
+            if handle == g_world.active_player {
+                player_data, is_player := ent.data.(Player_Data)
+                assert(is_player)
+                step_time ||= update_player(ent, delta_time)
+
+                if k2.key_went_down(.E) || k2.key_went_down(.Period) {
+                    next_player_type = Player_Type((int(player_data.type) + 1) % len(Player_Type))
+                } else if k2.key_went_down(.Q) || k2.key_went_down(.Comma) {
+                    next_player_type = Player_Type((int(player_data.type) + len(Player_Type) - 1) % len(Player_Type))
+                } 
+
+                g_world.camera.target += (cast([2]f32)(ent.pos * TILE_SIZE) + { TILE_SIZE / 2, TILE_SIZE / 2 } - g_world.camera.target) * 0.5            
             }
+        }
+
+        // Change player
+        if next_player_type != nil {
+            g_world.time_since_player_switch = 0.0
+            it = hm.iterator_make(&g_world.ents)
+            for ent, handle in hm.iterate(&it) {
+                player_data, is_player := ent.data.(Player_Data)
+                if is_player && player_data.type == next_player_type.? {
+                    g_world.active_player = handle
+                    break
+                }
+            }
+        }
+
+        if step_time {
+            g_world.time_since_last_step = 0.0
+            if len(g_previous_time_steps) == cap(g_previous_time_steps) {
+                pop_front(&g_previous_time_steps)
+            }
+            append(&g_previous_time_steps, previous_time_step^)
         }
     }
 
     k2.clear(k2.BLACK)
 	k2.set_camera(g_world.camera)
     
-    draw_world()
+    active_player_type := draw_world()
 
     k2.set_camera(k2.Camera{
         zoom = 2,
@@ -189,7 +188,12 @@ wall_at :: proc(pos: [2]int) -> int {
     return g_world.walls[flat_idx]
 }
 
-draw_world :: proc() {
+draw_world :: proc() -> (active_player_type: Player_Type) {
+    previous_time_step := g_world.time_step
+    if len(g_previous_time_steps) > 0 {
+        previous_time_step = g_previous_time_steps[len(g_previous_time_steps) - 1]
+    }
+
     tile_atlas_cols := g_textures[.TILES].width / TILE_SIZE
     tile_atlas_rows := g_textures[.TILES].height / TILE_SIZE
     // Draw floors
@@ -215,15 +219,32 @@ draw_world :: proc() {
     it := hm.iterator_make(&g_world.ents)
     for ent, handle in hm.iterate(&it) {
         if .VISIBLE not_in ent.flags do continue
+
+        // Smoothly animate the position from one step to the next
+        // target_sprite_pos := cast([2]f32)(ent.pos * TILE_SIZE)
+        // previous_sprite_pos := target_sprite_pos
+        // if prev_ent, ok := hm.static_get(&previous_time_step.ents, handle); ok {
+        //     previous_sprite_pos = cast([2]f32)(prev_ent.pos * TILE_SIZE)
+        // }
+        // sprite_pos := target_sprite_pos
+        // if target_sprite_pos != previous_sprite_pos {
+        //     t := min(1.0, g_world.time_since_last_step * 4.0)
+        //     sprite_pos = previous_sprite_pos + (target_sprite_pos - previous_sprite_pos) * ease.cubic_out(t)
+        // }
+        sprite_pos := cast([2]f32)(ent.pos * TILE_SIZE)
+
         switch data in ent.data {
             case Player_Data: {
-                if handle == g_world.active_player && g_world.time_since_player_switch < 1.0 {
-                    draw_arrow_at = ent.sprite_pos + {16, math.sin(g_world.time_since_player_switch * 4.0) * 2}
+                if handle == g_world.active_player {
+                    active_player_type = data.type
+                    if g_world.time_since_player_switch < 1.0 {
+                        draw_arrow_at = sprite_pos + {16, math.sin(g_world.time_since_player_switch * 4.0) * 2}
+                    }
                 }
                 k2.draw_texture_rect(
                     g_textures[.CHARACTERS], 
                     Player_Rects[data.type],
-                    ent.sprite_pos, 
+                    sprite_pos, 
                 )
             }
             case Door_Data: {
@@ -237,14 +258,14 @@ draw_world :: proc() {
                 k2.draw_texture_rect(
                     g_textures[.TILES],
                     src,
-                    ent.sprite_pos,
+                    sprite_pos,
                 )
             }
             case Key_Data: {
                 k2.draw_texture_rect(
                     g_textures[.ITEMS],
                     { x = 0, y = 0, w = 16, h = 16 },
-                    ent.sprite_pos + { 0, math.sin(g_world.time_since_player_switch * 4.0) * 2 },
+                    sprite_pos + { 0, math.sin(g_world.time_since_player_switch * 4.0) * 2 },
                     { -8, -8 },
                 )
             }
@@ -289,6 +310,8 @@ draw_world :: proc() {
             { 8, 16 },
         )
     }
+
+    return
 }
 
 draw_hud :: proc(active_player_type: Player_Type) {

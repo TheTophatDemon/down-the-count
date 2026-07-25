@@ -58,7 +58,7 @@ player_remove_inventory :: proc(player: Entity, index: int) {
 	g_world.inventories[data.type][inventory_size - 1] = {}
 }
 
-update_player :: proc(player: ^Entity, delta_time: f32) {
+update_player :: proc(player: ^Entity, delta_time: f32) -> (step_time: bool) {
 	assert(player != nil)
 	player_data := &player.data.(Player_Data)
 	player_type := player_data.type
@@ -100,8 +100,9 @@ update_player :: proc(player: ^Entity, delta_time: f32) {
 	for other_ent, other_handle in hm.iterate(&it) {
 		if other_handle == player.handle || other_ent.pos != dest do continue
 		if .INTERACTABLE not_in other_ent.flags do continue
-		#partial switch &data in other_ent.data {
+		data_switch: #partial switch &data in other_ent.data {
 			case Door_Data: {
+				step_time = true
 				// Check for key possession
 				for item_handle, item_index in g_world.inventories[player_type] {
 					item_ent, exists := hm.static_get(&g_world.ents, item_handle)
@@ -112,6 +113,8 @@ update_player :: proc(player: ^Entity, delta_time: f32) {
 						player_remove_inventory(player^, item_index)
 						hm.static_remove(&g_world.ents, other_handle)
 						k2.play_sound(g_sounds[.UNLOCK])
+						movement_blocked = true
+						break data_switch
 					}
 				}
 				movement_blocked = true
@@ -122,6 +125,7 @@ update_player :: proc(player: ^Entity, delta_time: f32) {
 			}
 			case Key_Data: {
 				if player_add_inventory(player^, other_handle) {
+					step_time = true
 					other_ent.flags -= { .VISIBLE, .INTERACTABLE }
 					k2.play_sound(g_sounds[.KEY])
 				}
@@ -130,10 +134,12 @@ update_player :: proc(player: ^Entity, delta_time: f32) {
 	}
 
 	if player.pos != dest && !movement_blocked && wall_at(dest) == 0 {
+		step_time = true
 		player.pos = dest
 		footstep := g_sounds[.FOOTSTEP]
 		k2.set_sound_pitch(footstep, rand.float32_range(0.75, 1.25))
 		k2.set_sound_volume(footstep, rand.float32_range(0.5, 1.5))
 		k2.play_sound(footstep)
 	}
+	return
 }

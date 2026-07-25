@@ -1,4 +1,3 @@
-- Undo and redo?
 - Dialog
 - 9mm item
 - Door with 4 pressure plates
