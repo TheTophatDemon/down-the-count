@@ -194,7 +194,10 @@
           "originX": 0,
           "originY": 0,
           "values": {"name": "BOTTOMRIGHT"}
-        }
+        },
+        {"name": "Furniture", "id": 18, "_eid": "00722255", "x": 256, "y": 672, "originX": 0, "originY": 0},
+        {"name": "Furniture", "id": 19, "_eid": "00722255", "x": 608, "y": 448, "originX": 0, "originY": 0},
+        {"name": "Furniture", "id": 20, "_eid": "00722255", "x": 384, "y": 448, "originX": 0, "originY": 0}
       ]
     },
     {

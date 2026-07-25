@@ -23,6 +23,7 @@ Entity_Data :: union {
     Door_Data,
     Key_Data,
     Plate_Data,
+    Furniture_Data,
 }
 
 Entity_Flag :: enum {
@@ -154,9 +155,9 @@ step :: proc() -> bool {
         it := hm.iterator_make(&g_world.ents)
         for ent, handle in hm.iterate(&it) {
             if handle == g_world.active_player {
-                player_data, is_player := ent.data.(Player_Data)
+                player_data, is_player := &ent.data.(Player_Data)
                 assert(is_player)
-                step_time ||= update_player(ent, delta_time)
+                step_time ||= update_player(ent, player_data, delta_time)
 
                 if k2.key_went_down(.E) || k2.key_went_down(.Period) {
                     next_player_type = Player_Type((int(player_data.type) + 1) % len(Player_Type))
@@ -218,6 +219,25 @@ wall_at :: proc(pos: [2]int) -> int {
     }
     flat_idx := pos[0] + (pos[1] * g_world.wall_cols)
     return g_world.walls[flat_idx]
+}
+
+iterate_ents_at :: proc(it: ^hm.Static_Handle_Map_Iterator(type_of(g_world.ents)), pos: [2]int, blocking := false) -> (^Entity, Entity_Handle, bool) {
+    for ent, handle in hm.iterate(it) {
+        if pos.x >= ent.pos.x && pos.y >= ent.pos.y && 
+            pos.x < ent.pos.x + ent.size.x && pos.y < ent.pos.y + ent.size.y && 
+            .INTERACTABLE in ent.flags 
+        {
+            #partial switch _ in ent.data {
+                case Furniture_Data, Player_Data, Door_Data:
+                    return ent, handle, true
+                case:
+                    if !blocking {
+                        return ent, handle, true
+                    }
+            }
+        }
+    }
+    return nil, {}, false
 }
 
 // Shows dialog on the screen. The memory for the passed string is copied and managed by the dialog arena.
@@ -287,7 +307,8 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
             case Player_Data: return 5
             case Door_Data: return 4
             case Key_Data: return 3
-            case Plate_Data: return 2
+            case Furniture_Data: return 2
+            case Plate_Data: return 1
         }
         return 0
     }
@@ -365,6 +386,13 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
                         w = TILE_SIZE,
                         h = TILE_SIZE,
                     },
+                    sprite_pos
+                )
+            }
+            case Furniture_Data: {
+                k2.draw_texture_rect(
+                    g_textures[.ITEMS],
+                    { x = 64, y = 16, w = TILE_SIZE, h = TILE_SIZE },
                     sprite_pos
                 )
             }

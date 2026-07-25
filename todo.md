@@ -1,4 +1,3 @@
-- Panettone ability: Push blocks
 - Boromi ability: Walk through bars
 - Polenta ability: Jump over gaps
 - Muji ability: Turn into other people

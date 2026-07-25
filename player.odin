@@ -49,9 +49,8 @@ player_remove_inventory :: proc(player: Entity, index: int) {
 	ordered_remove(&g_world.inventories[data.type], index)
 }
 
-update_player :: proc(player: ^Entity, delta_time: f32) -> (step_time: bool) {
-	assert(player != nil)
-	player_data := &player.data.(Player_Data)
+update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f32) -> (step_time: bool) {
+	assert(player != nil && player_data != nil)
 	player_type := player_data.type
 
 	MOVE_INTERVAL :: 0.25
@@ -88,14 +87,8 @@ update_player :: proc(player: ^Entity, delta_time: f32) -> (step_time: bool) {
 
 	// Interact with entities being hit
 	it := hm.iterator_make(&g_world.ents)
-	for other_ent, other_handle in hm.iterate(&it) {
-		if other_handle == player.handle ||
-			dest.x < other_ent.pos.x || dest.x >= other_ent.pos.x + other_ent.size.x ||
-			dest.y < other_ent.pos.y || dest.y >= other_ent.pos.y + other_ent.size.y ||
-			.INTERACTABLE not_in other_ent.flags 
-		{
-			continue
-		}
+	for other_ent, other_handle in iterate_ents_at(&it, dest, false) {
+		if other_handle == player.handle do continue
 		data_switch: #partial switch &data in other_ent.data {
 			case Door_Data: {
 				step_time = true
@@ -117,6 +110,21 @@ update_player :: proc(player: ^Entity, delta_time: f32) -> (step_time: bool) {
 			}
 			case Player_Data: {
 				movement_blocked = true
+			}
+			case Furniture_Data: {
+				movement_blocked = true
+				if player_type == .PANETTONE {
+					push_to := other_ent.pos + movement
+					if wall_at(push_to) == 0 {
+						blocking_it := hm.iterator_make(&g_world.ents)
+						blocking_ent, _, _ := iterate_ents_at(&blocking_it, push_to, true)
+						if blocking_ent == nil {
+							other_ent.pos = push_to
+							step_time = true
+							movement_blocked = false
+						}
+					} 
+				}
 			}
 			case Key_Data: {
 				if player_add_inventory(player^, other_handle) {

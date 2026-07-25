@@ -155,6 +155,9 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 							pressed = false,
 						}
 					}
+					case "Furniture": {
+						ent.data = Furniture_Data{}
+					}
 				}
 				new_handle, ok := hm.static_add(&g_world.ents, ent)
 				if !ok {
@@ -218,6 +221,11 @@ update_door :: proc(door: ^Entity, door_data: ^Door_Data) {
 			door_data.inputs_fulfulled += 1
 		}
 	}
+	if door_data.inputs_fulfulled >= len(door_data.inputs_needed) {
+		door.flags -= {.INTERACTABLE}
+	} else {
+		door.flags += {.INTERACTABLE}
+	}
 }
 
 Key_Data :: struct {
@@ -244,3 +252,5 @@ update_plate :: proc(plate: ^Entity, plate_data: ^Plate_Data) {
 		k2.play_sound(g_sounds[.UNSWITCH])
 	}
 }
+
+Furniture_Data :: struct {}
