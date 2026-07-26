@@ -1,6 +1,5 @@
 package main
 
-import "core:slice"
 import "core:log"
 import "core:math/rand"
 import "core:fmt"
@@ -28,6 +27,14 @@ Muji_Disguise_Rects := [Player_Type]k2.Rect{
 	.PANETTONE = { x = 0, y = 32, w = TILE_SIZE, h = TILE_SIZE },
     .POLENTA = { x = 0, y = 64, w = TILE_SIZE, h = TILE_SIZE },
     .BOROMI = { x = 0, y = 96, w = TILE_SIZE, h = TILE_SIZE },
+}
+
+@(rodata)
+Player_Name_Rects := [Player_Type]k2.Rect{
+	.MUJI = { x = 0, y = 128, w = 64, h = 32 },
+	.PANETTONE = { x = 0, y = 160, w = 128, h = 32 },
+	.POLENTA = { x = 0, y = 192, w = 96, h = 32 },
+	.BOROMI = { x = 0, y = 224, w = 96, h = 32 },
 }
 
 Player_Data :: struct {

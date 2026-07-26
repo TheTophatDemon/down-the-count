@@ -534,10 +534,13 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
 }
 
 draw_hud :: proc(active_player_type: Player_Type) {
+
+    k2.draw_texture_rect(g_textures[.CHARACTERS], Player_Name_Rects[active_player_type], { 4, 4 })
+
     // Draw inventory
     for handle, i in g_world.inventories[active_player_type] {
         // Draw slot background
-        slot_pos := [2]f32{ 4, 4 + f32(i * 32) }
+        slot_pos := [2]f32{ 4, 40 + f32(i * 32) }
         k2.draw_texture_rect(g_textures[.ITEMS], { 32, 16, 32, 32 }, slot_pos)
 
         if item_ent, present := hm.static_get(&g_world.ents, handle); present {

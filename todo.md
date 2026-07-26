@@ -1,5 +1,5 @@
-- Put name of character at top left
 - Extend undo length
 - Ending
 - Tutorial dialog
+- More decoration
 - Character portraits
