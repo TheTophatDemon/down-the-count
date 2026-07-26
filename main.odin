@@ -389,10 +389,13 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
                 if ent.size.x > 1 {
                     // Big door
                     src.x = 160
-                    src.y = 64 + f32(TILE_SIZE * data.inputs_fulfulled)
+                    src.y = 64 + f32(TILE_SIZE * data.plates_pressed)
                     src.w = TILE_SIZE * 3
                 } else if wall_at(ent.pos + { -1, 0 }) != .EMPTY && wall_at(ent.pos + { 1, 0 }) != .EMPTY {
                     src.x += TILE_SIZE
+                }
+                if ent.size.x == 1 && ent.size.y == 1 && len(data.plates_needed) > 0 && data.plates_pressed < 4 {
+                    src.y += 224 + (src.h * f32(data.plates_pressed + (4 - len(data.plates_needed))))
                 }
                 k2.draw_texture_rect(
                     g_textures[.TILES],

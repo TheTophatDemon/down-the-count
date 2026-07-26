@@ -16,6 +16,7 @@ Ogmo_Entity_Values :: struct {
 	turn: int,
 	title: string,
 	message: string,
+	plates: string,
 }
 
 Ogmo_Entity :: struct {
@@ -133,14 +134,15 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 					case "Door": {
 						data := Door_Data{
 							message = ogmo_ent.values.message,
+							key_needed = ogmo_ent.values.key,
 						}
-						keys := ogmo_ent.values.key
-						for name in strings.split_iterator(&keys, ",") {
-							if len(data.inputs_needed) == cap(data.inputs_needed) {
-								log.warnf("Too many key names given for door: %v", ogmo_ent.values.key)
+						plates := ogmo_ent.values.plates
+						for name in strings.split_iterator(&plates, ",") {
+							if len(data.plates_needed) == cap(data.plates_needed) {
+								log.warnf("Too many plate names given for door: %v", ogmo_ent.values.plates)
 								break
 							}
-							append(&data.inputs_needed, name)
+							append(&data.plates_needed, name)
 						}
 						if wall_at(ent.pos + { -1, 0 }) != .EMPTY && 
 							wall_at(ent.pos + { 1, 0 }) == .EMPTY && 
@@ -243,21 +245,22 @@ Wall_Rects := [Wall_Type][16]k2.Rect{
 }
 
 Door_Data :: struct {
-	inputs_needed: [dynamic; 4]string,
-	inputs_fulfulled: int,
+	key_needed: string,
+	plates_needed: [dynamic; 4]string,
+	plates_pressed: int,
 	message: string,
 }
 
 update_door :: proc(door: ^Entity, door_data: ^Door_Data) {
-	door_data.inputs_fulfulled = 0
+	door_data.plates_pressed = 0
 	it := hm.iterator_make(&g_world.ents)
 	for ent, handle in hm.iterate(&it) {
 		plate_data, is_plate := ent.data.(Plate_Data)
-		if is_plate && plate_data.pressed && slice.any_of(door_data.inputs_needed[:], ent.name) {
-			door_data.inputs_fulfulled += 1
+		if is_plate && plate_data.pressed && slice.any_of(door_data.plates_needed[:], ent.name) {
+			door_data.plates_pressed += 1
 		}
 	}
-	if door_data.inputs_fulfulled >= len(door_data.inputs_needed) {
+	if len(door_data.plates_needed) > 0 && door_data.plates_pressed >= len(door_data.plates_needed) {
 		door.flags -= {.INTERACTABLE}
 	} else {
 		door.flags += {.INTERACTABLE}

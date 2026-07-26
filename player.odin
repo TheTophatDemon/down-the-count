@@ -121,7 +121,7 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 				for item_handle, item_index in g_world.inventories[player_data.type] {
 					item_ent, exists := hm.static_get(&g_world.ents, item_handle)
 					if !exists do continue
-					if slice.any_of(data.inputs_needed[:], item_ent.name) {
+					if data.key_needed == item_ent.name {
 						player_remove_inventory(player^, item_index)
 						hm.static_remove(&g_world.ents, other_handle)
 						k2.play_sound(g_sounds[.UNLOCK])
