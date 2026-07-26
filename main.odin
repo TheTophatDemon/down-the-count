@@ -56,7 +56,7 @@ g_world := struct{
     using time_step: Time_Step,
     arena: mem.Arena,
     wall_cols, wall_rows: int,
-    walls: [dynamic]int,
+    walls: [dynamic]Wall_Type,
     floor_cols, floor_rows: int,
     floors: [dynamic]int,
     camera: k2.Camera,
@@ -146,6 +146,7 @@ step :: proc() -> bool {
         }
     } else if (k2.key_went_down(.U) || k2.key_went_down(.Backspace)) && len(g_previous_time_steps) > 0 {
         g_world.time_step = pop(&g_previous_time_steps)
+        hm.clear(&g_world.effects)
     } else {
         previous_time_step, err := new_clone(g_world.time_step)
         if err != nil {
@@ -220,9 +221,9 @@ step :: proc() -> bool {
     return true
 }
 
-wall_at :: proc(pos: [2]int) -> int {
+wall_at :: proc(pos: [2]int) -> Wall_Type {
     if pos[0] < 0 || pos[1] < 0 || pos[0] >= g_world.wall_cols || pos[1] >= g_world.wall_rows {
-        return 0
+        return .EMPTY
     }
     flat_idx := pos[0] + (pos[1] * g_world.wall_cols)
     return g_world.walls[flat_idx]
@@ -372,7 +373,7 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
                     src.x = 160
                     src.y = 64 + f32(TILE_SIZE * data.inputs_fulfulled)
                     src.w = TILE_SIZE * 3
-                } else if wall_at(ent.pos + { -1, 0 }) > 0 && wall_at(ent.pos + { 1, 0 }) > 0 {
+                } else if wall_at(ent.pos + { -1, 0 }) != .EMPTY && wall_at(ent.pos + { 1, 0 }) != .EMPTY {
                     src.x += TILE_SIZE
                 }
                 k2.draw_texture_rect(
@@ -414,28 +415,35 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
     // Draw walls (using double grid tiling system)
     for y in 0..=g_world.wall_rows {
         for x in 0..=g_world.wall_cols {
-            neighbors: Wall_Neighbors
-            if wall_at({ x - 1, y - 1}) > 0 {
-                neighbors |= { .TOP_LEFT }
-            }
-            if wall_at({ x, y - 1}) > 0 {
-                neighbors |= { .TOP_RIGHT }
-            }
-            if wall_at({ x, y }) > 0 {
-                neighbors |= { .BOTTOM_RIGHT }
-            }
-            if wall_at({ x - 1, y }) > 0 {
-                neighbors |= { .BOTTOM_LEFT }
-            }
-            if neighbors != {} {
-                k2.draw_texture_rect(
-                    g_textures[.TILES], 
-                    Wall_Rects[transmute(u8)neighbors],
-                    { 
-                        f32(x * TILE_SIZE) - (TILE_SIZE / 2),
-                        f32(y * TILE_SIZE) - (TILE_SIZE / 2)
-                    }
-                )
+            for wall_type in ([?]Wall_Type{.PIT, .SOLID}) {
+                neighbors: Wall_Neighbors
+                if wall_at({ x - 1, y - 1}) == wall_type {
+                    neighbors |= { .TOP_LEFT }
+                }
+                if wall_at({ x, y - 1}) == wall_type {
+                    neighbors |= { .TOP_RIGHT }
+                }
+                if wall_at({ x, y }) == wall_type {
+                    neighbors |= { .BOTTOM_RIGHT }
+                }
+                if wall_at({ x - 1, y }) == wall_type {
+                    neighbors |= { .BOTTOM_LEFT }
+                }
+                src := Wall_Rects[wall_type][transmute(u8)neighbors]
+                // Water animation
+                if wall_type == .PIT && math.mod(g_world.time_since_start, 2.0) > 1.0 {
+                    src.y += 96
+                }
+                if neighbors != {} {
+                    k2.draw_texture_rect(
+                        g_textures[.TILES], 
+                        src,
+                        { 
+                            f32(x * TILE_SIZE) - (TILE_SIZE / 2),
+                            f32(y * TILE_SIZE) - (TILE_SIZE / 2)
+                        }
+                    )
+                }
             }
         }
     }

@@ -1,5 +1,7 @@
 package main
 
+import "core:math/linalg"
+import "core:math"
 import "core:slice"
 import "core:log"
 import "core:math/rand"
@@ -94,6 +96,21 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 
 	movement_blocked: bool
 
+	// Pit jumping
+	if player_data.active_type == .POLENTA {
+		wall_ahead := wall_at(dest)
+		if wall_ahead == .PIT {
+			dest += movement
+			it := hm.iterator_make(&g_world.ents)
+			blocking_ent, _, _ := iterate_ents_at(&it, dest, true)
+			if blocking_ent != nil {
+				// There is an entity blocking us on the other side of the gap.
+				movement_blocked = true
+				dest = player.pos
+			}
+		}
+	}
+
 	// Interact with entities being hit
 	it := hm.iterator_make(&g_world.ents)
 	for other_ent, other_handle in iterate_ents_at(&it, dest, false) {
@@ -130,7 +147,7 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 				movement_blocked = true
 				if player_data.active_type == .PANETTONE {
 					push_to := other_ent.pos + movement
-					if wall_at(push_to) == 0 {
+					if wall_at(push_to) == .EMPTY {
 						blocking_it := hm.iterator_make(&g_world.ents)
 						blocking_ent, _, _ := iterate_ents_at(&blocking_it, push_to, true)
 						if blocking_ent == nil {
@@ -155,7 +172,7 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 		}
 	}
 
-	if player.pos != dest && !movement_blocked && wall_at(dest) == 0 {
+	if player.pos != dest && !movement_blocked && wall_at(dest) == .EMPTY {
 		step_time = true
 		if player_data.active_type != player_data.type {
 			player_data.active_timer -= 1
@@ -167,11 +184,19 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 			}
 			spawn_counter(player.handle, player_data.active_timer)
 		}
+		if abs(dest.x - player.pos.x) + abs(dest.y - player.pos.y) > 1.0 {
+			jump := g_sounds[.JUMP]
+			k2.set_sound_pitch(jump, rand.float32_range(0.75, 1.25))
+			k2.set_sound_volume(jump, rand.float32_range(0.7, 1.0))
+			k2.play_sound(jump)
+			spawn_swoosh((player.pos + dest) / 2, movement)
+		} else {
+			footstep := g_sounds[.FOOTSTEP]
+			k2.set_sound_pitch(footstep, rand.float32_range(0.75, 1.25))
+			k2.set_sound_volume(footstep, rand.float32_range(0.4, 0.8))
+			k2.play_sound(footstep)
+		}
 		player.pos = dest
-		footstep := g_sounds[.FOOTSTEP]
-		k2.set_sound_pitch(footstep, rand.float32_range(0.75, 1.25))
-		k2.set_sound_volume(footstep, rand.float32_range(0.4, 0.8))
-		k2.play_sound(footstep)
 	}
 	return
 }

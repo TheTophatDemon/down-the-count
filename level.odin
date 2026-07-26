@@ -68,13 +68,13 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 				assert(len(layer.grid) == layer.num_cols * layer.num_rows)
 				g_world.wall_cols = layer.num_cols
 				g_world.wall_rows = layer.num_rows
-				g_world.walls = make([dynamic]int, len(layer.grid))
+				g_world.walls = make([dynamic]Wall_Type, len(layer.grid))
 				for i in 0..<len(layer.grid) {
-					ok: bool
-					g_world.walls[i], ok = strconv.parse_int(layer.grid[i])
+					wall_number, ok := strconv.parse_int(layer.grid[i])
 					if !ok {
 						log.warnf("grid tile at index %v did not parse correctly", i)
 					}
+					g_world.walls[i] = Wall_Type(wall_number)
 				}
 			}
 			case "Floors": {
@@ -142,7 +142,10 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 							}
 							append(&data.inputs_needed, name)
 						}
-						if wall_at(ent.pos + { -1, 0 }) > 0 && wall_at(ent.pos + { 1, 0 }) == 0 && wall_at(ent.pos + { 2, 0 }) == 0 {
+						if wall_at(ent.pos + { -1, 0 }) != .EMPTY && 
+							wall_at(ent.pos + { 1, 0 }) == .EMPTY && 
+							wall_at(ent.pos + { 2, 0 }) == .EMPTY 
+						{
 							// Turn into a big door if there's enough space.
 							ent.size = [2]int{3, 1}
 						}
@@ -180,6 +183,12 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 	return nil
 }
 
+Wall_Type :: enum {
+	EMPTY,
+	SOLID,
+	PIT,
+}
+
 Wall_Neighbor :: enum {
     TOP_LEFT,
     TOP_RIGHT,
@@ -190,23 +199,44 @@ Wall_Neighbor :: enum {
 Wall_Neighbors :: bit_set[Wall_Neighbor]
 
 @(rodata)
-Wall_Rects := [16]k2.Rect{
-    0 = { x = 160, y = 0, w = TILE_SIZE, h = TILE_SIZE },
-    1 = { x = 64, y = 64, w = TILE_SIZE, h = TILE_SIZE },
-    2 = { x = 0, y = 64, w = TILE_SIZE, h = TILE_SIZE },
-    3 = { x = 32, y = 64, w = TILE_SIZE, h = TILE_SIZE },
-    4 = { x = 0, y = 0, w = TILE_SIZE, h = TILE_SIZE },
-    5 = { x = 96, y = 0, w = TILE_SIZE, h = TILE_SIZE },
-    6 = { x = 0, y = 32, w = TILE_SIZE, h = TILE_SIZE },
-    7 = { x = 128, y = 32, w = TILE_SIZE, h = TILE_SIZE },
-    8 = { x = 64, y = 0, w = TILE_SIZE, h = TILE_SIZE },
-    9 = { x = 64, y = 32, w = TILE_SIZE, h = TILE_SIZE },
-    10 = { x = 128, y = 0, w = TILE_SIZE, h = TILE_SIZE },
-    11 = { x = 96, y = 32, w = TILE_SIZE, h = TILE_SIZE },
-    12 = { x = 32, y = 0, w = TILE_SIZE, h = TILE_SIZE },
-    13 = { x = 96, y = 64, w = TILE_SIZE, h = TILE_SIZE },
-    14 = { x = 128, y = 64, w = TILE_SIZE, h = TILE_SIZE },
-    15 = { x = 32, y = 32, w = TILE_SIZE, h = TILE_SIZE },
+Wall_Rects := [Wall_Type][16]k2.Rect{
+	.EMPTY = {},
+	.SOLID = {
+		0 = { x = 160, y = 0, w = TILE_SIZE, h = TILE_SIZE },
+		1 = { x = 64, y = 64, w = TILE_SIZE, h = TILE_SIZE },
+		2 = { x = 0, y = 64, w = TILE_SIZE, h = TILE_SIZE },
+		3 = { x = 32, y = 64, w = TILE_SIZE, h = TILE_SIZE },
+		4 = { x = 0, y = 0, w = TILE_SIZE, h = TILE_SIZE },
+		5 = { x = 96, y = 0, w = TILE_SIZE, h = TILE_SIZE },
+		6 = { x = 0, y = 32, w = TILE_SIZE, h = TILE_SIZE },
+		7 = { x = 128, y = 32, w = TILE_SIZE, h = TILE_SIZE },
+		8 = { x = 64, y = 0, w = TILE_SIZE, h = TILE_SIZE },
+		9 = { x = 64, y = 32, w = TILE_SIZE, h = TILE_SIZE },
+		10 = { x = 128, y = 0, w = TILE_SIZE, h = TILE_SIZE },
+		11 = { x = 96, y = 32, w = TILE_SIZE, h = TILE_SIZE },
+		12 = { x = 32, y = 0, w = TILE_SIZE, h = TILE_SIZE },
+		13 = { x = 96, y = 64, w = TILE_SIZE, h = TILE_SIZE },
+		14 = { x = 128, y = 64, w = TILE_SIZE, h = TILE_SIZE },
+		15 = { x = 32, y = 32, w = TILE_SIZE, h = TILE_SIZE },
+	},
+	.PIT = {
+		0 = { x = 160, y = 160, w = TILE_SIZE, h = TILE_SIZE },
+		1 = { x = 64, y = 224, w = TILE_SIZE, h = TILE_SIZE },
+		2 = { x = 0, y = 224, w = TILE_SIZE, h = TILE_SIZE },
+		3 = { x = 32, y = 224, w = TILE_SIZE, h = TILE_SIZE },
+		4 = { x = 0, y = 160, w = TILE_SIZE, h = TILE_SIZE },
+		5 = { x = 96, y = 160, w = TILE_SIZE, h = TILE_SIZE },
+		6 = { x = 0, y = 192, w = TILE_SIZE, h = TILE_SIZE },
+		7 = { x = 128, y = 192, w = TILE_SIZE, h = TILE_SIZE },
+		8 = { x = 64, y = 160, w = TILE_SIZE, h = TILE_SIZE },
+		9 = { x = 64, y = 192, w = TILE_SIZE, h = TILE_SIZE },
+		10 = { x = 128, y = 160, w = TILE_SIZE, h = TILE_SIZE },
+		11 = { x = 96, y = 192, w = TILE_SIZE, h = TILE_SIZE },
+		12 = { x = 32, y = 160, w = TILE_SIZE, h = TILE_SIZE },
+		13 = { x = 96, y = 224, w = TILE_SIZE, h = TILE_SIZE },
+		14 = { x = 128, y = 224, w = TILE_SIZE, h = TILE_SIZE },
+		15 = { x = 32, y = 192, w = TILE_SIZE, h = TILE_SIZE },
+	},
 }
 
 Door_Data :: struct {

@@ -1,4 +1,3 @@
 - Boromi ability: Walk through bars
-- Polenta ability: Jump over gaps
 - 9mm item
 - Ending

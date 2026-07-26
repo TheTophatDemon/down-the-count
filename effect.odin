@@ -32,11 +32,19 @@ spawn_smoke :: proc(grid_pos: [2]int) -> Effect_Handle {
 }
 
 spawn_arrow :: proc(follow_target: Entity_Handle) -> Effect_Handle {
+    ARROW_RECT :: k2.Rect{x = 160, y = 0, w = 16, h = 16}
+    // Kill other arrows
+    it := hm.iterator_make(&g_world.effects)
+    for effect, handle in hm.iterate(&it) {
+        if len(effect.animation) > 0 && effect.animation[0] == ARROW_RECT {
+            hm.remove(&g_world.effects, handle)
+        }
+    }
     handle, _ := hm.add(&g_world.effects, Effect_Data{
         pos = {8, -16},
         texture = g_textures[.CHARACTERS],
         animation = {
-            k2.Rect{x = 160, y = 0, w = 16, h = 16},
+            ARROW_RECT,
         },
         speed = 1.0,
         bob_speed = 4.0,
@@ -63,6 +71,18 @@ spawn_counter :: proc(follow_target: Entity_Handle, number: int) -> Effect_Handl
         },
         speed = 1.0,
         follow_entity = follow_target,
+    })
+    return handle
+}
+
+spawn_swoosh :: proc(grid_pos: [2]int, movement: [2]int) -> Effect_Handle {
+    handle, _ := hm.add(&g_world.effects, Effect_Data{
+        pos = cast([2]f32)(grid_pos * TILE_SIZE),
+        texture = g_textures[.CHARACTERS],
+        animation = {
+            k2.Rect{ x = 64, y = (32 if movement.y != 0 else 64), w = 32, h = 32 },
+        },
+        speed = 0.3,
     })
     return handle
 }
