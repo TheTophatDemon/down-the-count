@@ -25,6 +25,8 @@ Entity_Data :: union {
     Plate_Data,
     Furniture_Data,
     Bars_Data,
+    Trigger_Data,
+    Venizi_Data,
 }
 
 Entity_Flag :: enum {
@@ -73,6 +75,7 @@ g_world := struct{
     dialog_shown_line: string,
     effects: hm.Static_Handle_Map(32, Effect_Data, Effect_Handle),
     music: k2.Audio_Stream,
+    win: bool,
 }{}
 
 main :: proc() {
@@ -161,7 +164,7 @@ step :: proc() -> bool {
     } else if (k2.key_went_down(.U) || k2.key_went_down(.Backspace)) && len(g_previous_time_steps) > 0 {
         g_world.time_step = pop(&g_previous_time_steps)
         hm.clear(&g_world.effects)
-    } else {
+    } else if !g_world.win {
         previous_time_step, err := new_clone(g_world.time_step)
         if err != nil {
             log.errorf("error allocating memory for previous time step: %v", err)
@@ -221,12 +224,20 @@ step :: proc() -> bool {
     k2.clear(k2.BLACK)
 	k2.set_camera(g_world.camera)
     
-    active_player_type := draw_world()
+    if !g_world.win || len(g_world.dialog) != 0 {
+        active_player_type := draw_world()
+    
+        k2.set_camera(k2.Camera{
+            zoom = 2,
+        })
+        draw_hud(active_player_type)
+    } else {
+        k2.set_camera(k2.Camera{
+            zoom = 2,
+        })
+        k2.draw_text("You are a wieinner", { 4, 4}, 64, k2.YELLOW)
+    }
 
-    k2.set_camera(k2.Camera{
-        zoom = 2,
-    })
-    draw_hud(active_player_type)
 
     k2.present()
 
@@ -382,11 +393,13 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
     entity_priority :: proc(ent: Entity) -> int {
         switch _ in ent.data {
             case Bars_Data: return 6
+            case Venizi_Data: return 5
             case Player_Data: return 5
             case Door_Data: return 4
             case Key_Data: return 3
             case Furniture_Data: return 2
             case Plate_Data: return 1
+            case Trigger_Data: return 0
         }
         return 0
     }
@@ -507,6 +520,16 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
                     g_textures[.TILES],
                     src,
                     sprite_pos,
+                )
+            }
+            case Trigger_Data: {
+                //Nothing
+            }
+            case Venizi_Data: {
+                k2.draw_texture_rect(
+                    g_textures[.CHARACTERS], 
+                    { x = 128, y = 0, w = 32, h = 32 },
+                    sprite_pos, 
                 )
             }
         }

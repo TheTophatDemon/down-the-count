@@ -183,6 +183,11 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 				}
 				movement_blocked = true
 			}
+			case Trigger_Data: {
+				movement_blocked = true
+				show_dialog(data.message)
+				g_world.win = true
+			}
 		}
 	}
 

@@ -1,4 +1,3 @@
-- Ending
 - Tutorial dialog
 - More decoration
 - Character portraits
