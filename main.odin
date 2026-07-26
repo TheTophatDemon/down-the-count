@@ -53,6 +53,8 @@ g_previous_time_steps: [dynamic; 32]Time_Step
 
 g_world_memory: []u8
 
+g_music_muted: bool = false
+
 g_world := struct{
     using time_step: Time_Step,
     arena: mem.Arena,
@@ -70,6 +72,7 @@ g_world := struct{
     dialog_shown_length: int,
     dialog_shown_line: string,
     effects: hm.Static_Handle_Map(32, Effect_Data, Effect_Handle),
+    music: k2.Audio_Stream,
 }{}
 
 main :: proc() {
@@ -122,6 +125,16 @@ step :: proc() -> bool {
     g_world.time_since_last_step += delta_time
     g_world.time_since_dialog += delta_time
     g_world.time_since_dialog_character += delta_time
+
+    if k2.key_went_down(.M) {
+        g_music_muted = !g_music_muted
+        if g_music_muted {
+            k2.set_audio_stream_volume(g_world.music, 0.0)
+        } else {
+            k2.set_audio_stream_volume(g_world.music, 1.0)
+        }
+    }
+    k2.update_audio_stream(g_world.music)
 
     // Update effects
     it := hm.iterator_make(&g_world.effects)
@@ -271,6 +284,7 @@ show_dialog :: proc(dialog: string) {
     if dialog == "" {
         mem.arena_free_all(&g_world.dialog_arena)
         g_world.dialog = ""
+        g_world.time_since_dialog = 10.0 // Prevent animation from playing
     } else {
         my_dialog, err := strings.clone(dialog)
         if err != nil {
@@ -278,10 +292,10 @@ show_dialog :: proc(dialog: string) {
             return
         }
         g_world.dialog = my_dialog
+        g_world.time_since_dialog = 0.0
     }
         
     g_world.dialog_shown_length = 0
-    g_world.time_since_dialog = 0.0
     g_world.dialog_shown_line, _, _ = strings.partition(g_world.dialog, "\n")
 }
 
@@ -311,6 +325,42 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
         )
     }
 
+    // Draw walls (using double grid tiling system)
+    for y in 0..=g_world.wall_rows {
+        for x in 0..=g_world.wall_cols {
+            for wall_type in ([?]Wall_Type{.PIT, .SOLID}) {
+                neighbors: Wall_Neighbors
+                if wall_at({ x - 1, y - 1}) == wall_type {
+                    neighbors |= { .TOP_LEFT }
+                }
+                if wall_at({ x, y - 1}) == wall_type {
+                    neighbors |= { .TOP_RIGHT }
+                }
+                if wall_at({ x, y }) == wall_type {
+                    neighbors |= { .BOTTOM_RIGHT }
+                }
+                if wall_at({ x - 1, y }) == wall_type {
+                    neighbors |= { .BOTTOM_LEFT }
+                }
+                src := Wall_Rects[wall_type][transmute(u8)neighbors]
+                // Water animation
+                if wall_type == .PIT && math.mod(g_world.time_since_start, 2.0) > 1.0 {
+                    src.y += 96
+                }
+                if neighbors != {} {
+                    k2.draw_texture_rect(
+                        g_textures[.TILES], 
+                        src,
+                        { 
+                            f32(x * TILE_SIZE) - (TILE_SIZE / 2),
+                            f32(y * TILE_SIZE) - (TILE_SIZE / 2)
+                        }
+                    )
+                }
+            }
+        }
+    }
+
     // Draw entities
     draw_arrow_at: Maybe([2]f32)
 
@@ -320,10 +370,12 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
         return
     }
 
-    it := hm.iterator_make(&g_world.ents)
-    for ent, handle in hm.iterate(&it) {
-        if .VISIBLE not_in ent.flags do continue
-        append(&sorted_entities, ent)
+    {
+        it := hm.iterator_make(&g_world.ents)
+        for ent, handle in hm.iterate(&it) {
+            if .VISIBLE not_in ent.flags do continue
+            append(&sorted_entities, ent)
+        }
     }
 
     // Returns the drawing order of the entity based on its type.
@@ -394,8 +446,14 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
                 } else if wall_at(ent.pos + { -1, 0 }) != .EMPTY && wall_at(ent.pos + { 1, 0 }) != .EMPTY {
                     src.x += TILE_SIZE
                 }
-                if ent.size.x == 1 && ent.size.y == 1 && len(data.plates_needed) > 0 && data.plates_pressed < 4 {
-                    src.y += 224 + (src.h * f32(data.plates_pressed + (4 - len(data.plates_needed))))
+                if ent.size.x == 1 && ent.size.y == 1 {
+                    if len(data.plates_needed) > 0 {
+                        if data.plates_pressed < 4 && data.plates_pressed != len(data.plates_needed) {
+                            src.y += 224 + (src.h * f32(data.plates_pressed + (4 - len(data.plates_needed))))
+                        } else {
+                            break
+                        }
+                    }
                 }
                 k2.draw_texture_rect(
                     g_textures[.TILES],
@@ -434,7 +492,15 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
                 src := k2.Rect{
                     x = 160, y = 32, w = TILE_SIZE, h = TILE_SIZE,
                 }
-                if wall_at(ent.pos + { -1, 0 }) != .EMPTY {
+                left_pos := ent.pos + { -1, 0 }
+                it := hm.iterator_make(&g_world.ents)
+                
+                is_bar_to_left := false
+                for ent_to_left, _ in iterate_ents_at(&it, left_pos, true) {
+                    _, is_bar := ent_to_left.data.(Bars_Data)
+                    is_bar_to_left ||= is_bar
+                }
+                if is_bar_to_left || wall_at(left_pos) != .EMPTY {
                     src.x += 32
                 }
                 k2.draw_texture_rect(
@@ -442,42 +508,6 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
                     src,
                     sprite_pos,
                 )
-            }
-        }
-    }
-
-    // Draw walls (using double grid tiling system)
-    for y in 0..=g_world.wall_rows {
-        for x in 0..=g_world.wall_cols {
-            for wall_type in ([?]Wall_Type{.PIT, .SOLID}) {
-                neighbors: Wall_Neighbors
-                if wall_at({ x - 1, y - 1}) == wall_type {
-                    neighbors |= { .TOP_LEFT }
-                }
-                if wall_at({ x, y - 1}) == wall_type {
-                    neighbors |= { .TOP_RIGHT }
-                }
-                if wall_at({ x, y }) == wall_type {
-                    neighbors |= { .BOTTOM_RIGHT }
-                }
-                if wall_at({ x - 1, y }) == wall_type {
-                    neighbors |= { .BOTTOM_LEFT }
-                }
-                src := Wall_Rects[wall_type][transmute(u8)neighbors]
-                // Water animation
-                if wall_type == .PIT && math.mod(g_world.time_since_start, 2.0) > 1.0 {
-                    src.y += 96
-                }
-                if neighbors != {} {
-                    k2.draw_texture_rect(
-                        g_textures[.TILES], 
-                        src,
-                        { 
-                            f32(x * TILE_SIZE) - (TILE_SIZE / 2),
-                            f32(y * TILE_SIZE) - (TILE_SIZE / 2)
-                        }
-                    )
-                }
             }
         }
     }

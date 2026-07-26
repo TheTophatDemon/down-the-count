@@ -26,6 +26,12 @@ Sound_Key :: enum {
 
 g_sounds := [Sound_Key]k2.Sound{}
 
+Music_Key :: enum {
+	CREEPIN_SPOOKIN,
+}
+
+g_music := [Music_Key]k2.Audio_Stream{}
+
 load_assets :: proc() {
 	g_textures[.TILES] = k2.load_texture_from_bytes(#load("assets/tiles.png"))
 	g_textures[.CHARACTERS] = k2.load_texture_from_bytes(#load("assets/characters.png"))
@@ -41,6 +47,7 @@ load_assets :: proc() {
 	g_sounds[.POOF] = k2.load_sound_from_bytes(#load("assets/poof.wav"))
 	g_sounds[.JUMP] = k2.load_sound_from_bytes(#load("assets/jump.wav"))
 	g_sounds[.CRUNCH] = k2.load_sound_from_bytes(#load("assets/crunch.wav"))
+	g_music[.CREEPIN_SPOOKIN] = k2.load_audio_stream_from_bytes(#load("assets/the_creepin_spookin.ogg"))
 }
 
 unload_assets :: proc() {
@@ -49,5 +56,8 @@ unload_assets :: proc() {
 	}
 	for sound in g_sounds {
 		k2.destroy_sound(sound)
+	}
+	for music in g_music {
+		k2.destroy_audio_stream(music)
 	}
 }

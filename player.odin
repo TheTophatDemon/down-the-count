@@ -137,7 +137,7 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 				movement_blocked = true
 				if player_data.type == .MUJI {
 					player_data.active_type = data.type
-					player_data.active_timer = 20
+					player_data.active_timer = 10
 					k2.play_sound(g_sounds[.POOF])
 					spawn_smoke(player.pos)
 				}
@@ -169,12 +169,14 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 				}
 			}
 			case Bars_Data: {
-				if player_data.active_type == .BOROMI {
-					k2.play_sound(g_sounds[.CRUNCH])
-					hm.remove(&g_world.ents, other_handle)
-				} else {
-					movement_blocked = true
+				if player_data.active_type == .BOROMI && movement != {} {
+					// k2.play_sound(g_sounds[.CRUNCH])
+					// hm.remove(&g_world.ents, other_handle)
+					k2.play_sound(g_sounds[.JUMP])
+					movement_blocked = false
+					break
 				}
+				movement_blocked = true
 			}
 		}
 	}

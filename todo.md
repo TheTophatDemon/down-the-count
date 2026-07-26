@@ -1,2 +1,5 @@
-- 9mm item
+- Put name of character at top left
+- Extend undo length
 - Ending
+- Tutorial dialog
+- Character portraits

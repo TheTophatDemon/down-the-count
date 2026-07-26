@@ -49,12 +49,15 @@ Ogmo_Map :: struct {
 }
 
 load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
+	k2.stop_audio_stream(g_world.music)
+	
 	g_world = {
 		camera = k2.Camera{
 			zoom = 2.0,
 			offset = { WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 },
 		},
 		time_since_dialog = 10.0,
+		music = g_music[.CREEPIN_SPOOKIN],
 	}
 	mem.arena_init(&g_world.arena, g_world_memory)
 	context.allocator = mem.arena_allocator(&g_world.arena)
@@ -184,6 +187,10 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 			break
 		}
 	}
+
+	k2.set_audio_stream_loop(g_world.music, true)
+	k2.play_audio_stream(g_world.music)
+	k2.update_audio_stream(g_world.music)
 
 	return nil
 }
