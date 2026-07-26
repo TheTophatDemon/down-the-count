@@ -24,6 +24,7 @@ Entity_Data :: union {
     Key_Data,
     Plate_Data,
     Furniture_Data,
+    Bars_Data,
 }
 
 Entity_Flag :: enum {
@@ -229,6 +230,22 @@ wall_at :: proc(pos: [2]int) -> Wall_Type {
     return g_world.walls[flat_idx]
 }
 
+floor_at :: proc(pos: [2]int) -> int {
+    if pos[0] < 0 || pos[1] < 0 || pos[0] >= g_world.floor_cols || pos[1] >= g_world.floor_rows {
+        return -1
+    }
+    flat_idx := pos[0] + (pos[1] * g_world.floor_cols)
+    return g_world.floors[flat_idx]
+}
+
+set_floor_at :: proc(pos: [2]int, floor_index: int) {
+    if pos[0] < 0 || pos[1] < 0 || pos[0] >= g_world.floor_cols || pos[1] >= g_world.floor_rows {
+        return
+    }
+    flat_idx := pos[0] + (pos[1] * g_world.floor_cols)
+    g_world.floors[flat_idx] = floor_index
+}
+
 iterate_ents_at :: proc(it: ^hm.Static_Handle_Map_Iterator(type_of(g_world.ents)), pos: [2]int, blocking := false) -> (^Entity, Entity_Handle, bool) {
     for ent, handle in hm.iterate(it) {
         if pos.x >= ent.pos.x && pos.y >= ent.pos.y && 
@@ -236,7 +253,7 @@ iterate_ents_at :: proc(it: ^hm.Static_Handle_Map_Iterator(type_of(g_world.ents)
             .INTERACTABLE in ent.flags 
         {
             #partial switch _ in ent.data {
-                case Furniture_Data, Player_Data, Door_Data:
+                case Furniture_Data, Player_Data, Door_Data, Bars_Data:
                     return ent, handle, true
                 case:
                     if !blocking {
@@ -312,6 +329,7 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
     // Returns the drawing order of the entity based on its type.
     entity_priority :: proc(ent: Entity) -> int {
         switch _ in ent.data {
+            case Bars_Data: return 6
             case Player_Data: return 5
             case Door_Data: return 4
             case Key_Data: return 3
@@ -407,6 +425,19 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
                     g_textures[.ITEMS],
                     { x = 64, y = 16, w = TILE_SIZE, h = TILE_SIZE },
                     sprite_pos
+                )
+            }
+            case Bars_Data: {
+                src := k2.Rect{
+                    x = 160, y = 32, w = TILE_SIZE, h = TILE_SIZE,
+                }
+                if wall_at(ent.pos + { -1, 0 }) != .EMPTY {
+                    src.x += 32
+                }
+                k2.draw_texture_rect(
+                    g_textures[.TILES],
+                    src,
+                    sprite_pos,
                 )
             }
         }

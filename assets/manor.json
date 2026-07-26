@@ -197,7 +197,10 @@
         },
         {"name": "Furniture", "id": 18, "_eid": "00722255", "x": 256, "y": 672, "originX": 0, "originY": 0},
         {"name": "Furniture", "id": 19, "_eid": "00722255", "x": 640, "y": 448, "originX": 0, "originY": 0},
-        {"name": "Furniture", "id": 20, "_eid": "00722255", "x": 384, "y": 448, "originX": 0, "originY": 0}
+        {"name": "Furniture", "id": 20, "_eid": "00722255", "x": 384, "y": 448, "originX": 0, "originY": 0},
+        {"name": "Bars", "id": 21, "_eid": "02722034", "x": 800, "y": 480, "originX": 0, "originY": 0},
+        {"name": "Bars", "id": 22, "_eid": "02722034", "x": 960, "y": 640, "originX": 0, "originY": 0},
+        {"name": "Bars", "id": 23, "_eid": "02722034", "x": 576, "y": 832, "originX": 0, "originY": 0}
       ]
     },
     {

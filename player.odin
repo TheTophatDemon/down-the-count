@@ -1,7 +1,5 @@
 package main
 
-import "core:math/linalg"
-import "core:math"
 import "core:slice"
 import "core:log"
 import "core:math/rand"
@@ -36,6 +34,7 @@ Player_Data :: struct {
     type: Player_Type,
 	active_type: Player_Type, // The type that determines player abilities. This allows Muji to act like other player types.
 	active_timer: int, // Number of turns before active type resets.
+	moss_interactions: int, // Number of times interacted with moss.
 }
 
 player_add_inventory :: proc(player: Entity, item_handle: Entity_Handle) -> bool {
@@ -169,6 +168,14 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 					show_dialog(fmt.tprintf("You got %v.", data.title))
 				}
 			}
+			case Bars_Data: {
+				if player_data.active_type == .BOROMI {
+					k2.play_sound(g_sounds[.CRUNCH])
+					hm.remove(&g_world.ents, other_handle)
+				} else {
+					movement_blocked = true
+				}
+			}
 		}
 	}
 
@@ -197,6 +204,35 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 			k2.play_sound(footstep)
 		}
 		player.pos = dest
+
+		// Moss interactions
+		if floor_at(dest) == 32 {
+			#partial switch player_data.type {
+				case .BOROMI: {
+					k2.play_sound(g_sounds[.CRUNCH])
+					set_floor_at(dest, 24)
+				}
+				case .PANETTONE: {
+					if player_data.moss_interactions == 0 {
+						show_dialog(
+							"Panettone: \"Aaah, this moss is-a poorly seasoned.\"\n" +
+							"Panettone: \"I should have brought my, aaah, emergency oregano.\""
+						)
+					}
+				}
+				case .MUJI: {
+					if player_data.moss_interactions == 0 {
+						show_dialog("Muji: \"You know, I'm not going to eat that moss...\"")
+					}
+				}
+				case .POLENTA: {
+					if player_data.moss_interactions == 0 {
+						show_dialog("Polenta: \"I wonder if my blockhead brother would eat this moss without seasoning...\"")
+					}
+				}
+			}
+			player_data.moss_interactions += 1
+		}
 	}
 	return
 }

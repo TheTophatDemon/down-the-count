@@ -164,6 +164,9 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 					case "Furniture": {
 						ent.data = Furniture_Data{}
 					}
+					case "Bars": {
+						ent.data = Bars_Data{}
+					}
 				}
 				new_handle, ok := hm.static_add(&g_world.ents, ent)
 				if !ok {
@@ -287,3 +290,5 @@ update_plate :: proc(plate: ^Entity, plate_data: ^Plate_Data) {
 }
 
 Furniture_Data :: struct {}
+
+Bars_Data :: struct {}

@@ -6,3 +6,4 @@ switch, unswitch https://freesound.org/people/EricsSoundschmiede/sounds/457410/
 push https://freesound.org/people/Mafon2/sounds/349913/
 poof https://freesound.org/people/saangosu/sounds/815438/
 jump https://freesound.org/people/SamuelGremaud/sounds/517636/
+crunch https://freesound.org/people/Zott820/sounds/655708/

@@ -1,3 +1,2 @@
-- Boromi ability: Walk through bars
 - 9mm item
 - Ending
