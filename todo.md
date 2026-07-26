@@ -1,4 +1,3 @@
-- Extend undo length
 - Ending
 - Tutorial dialog
 - More decoration

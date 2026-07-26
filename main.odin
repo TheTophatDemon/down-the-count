@@ -49,7 +49,7 @@ Time_Step :: struct {
     inventories: [Player_Type][dynamic; 4]Entity_Handle,
 }
 
-g_previous_time_steps: [dynamic; 32]Time_Step
+g_previous_time_steps: [dynamic; 128]Time_Step
 
 g_world_memory: []u8
 
