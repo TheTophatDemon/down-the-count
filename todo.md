@@ -1,3 +1,7 @@
+- Stop unwanted scrolling in web player
+- Support high DPI
 - Tutorial dialog
+- Title screen
 - More decoration
 - Character portraits
+- Secret item

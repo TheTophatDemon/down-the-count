@@ -178,10 +178,9 @@ update_player :: proc(player: ^Entity, player_data: ^Player_Data, delta_time: f3
 			case Bars_Data: {
 				if player_data.active_type == .BOROMI && movement != {} {
 					k2.play_sound(g_sounds[.JUMP])
-					movement_blocked = false
-					break
+				} else {
+					movement_blocked = true
 				}
-				movement_blocked = true
 			}
 			case Trigger_Data: {
 				movement_blocked = true
