@@ -6,6 +6,8 @@ Texture_Key :: enum {
 	TILES,
 	CHARACTERS,
 	ITEMS,
+	INSTRUCTIONS_EN,
+	INSTRUCTIONS_RU,
 }
 
 g_textures := [Texture_Key]k2.Texture{}
@@ -36,6 +38,8 @@ load_assets :: proc() {
 	g_textures[.TILES] = k2.load_texture_from_bytes(#load("assets/tiles.png"))
 	g_textures[.CHARACTERS] = k2.load_texture_from_bytes(#load("assets/characters.png"))
 	g_textures[.ITEMS] = k2.load_texture_from_bytes(#load("assets/items.png"))
+	g_textures[.INSTRUCTIONS_EN] = k2.load_texture_from_bytes(#load("assets/instructions_en.png"))
+	g_textures[.INSTRUCTIONS_RU] = k2.load_texture_from_bytes(#load("assets/instructions_ru.png"))
 	g_sounds[.FOOTSTEP] = k2.load_sound_from_bytes(#load("assets/footstep.wav"))
 	g_sounds[.KEY] = k2.load_sound_from_bytes(#load("assets/key.wav"))
 	g_sounds[.LOCKED] = k2.load_sound_from_bytes(#load("assets/locked.wav"))

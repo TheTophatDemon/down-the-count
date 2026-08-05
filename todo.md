@@ -1,4 +1,3 @@
-- Stop unwanted scrolling in web player
 - Support high DPI
 - Tutorial dialog
 - Title screen

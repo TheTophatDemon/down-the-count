@@ -57,6 +57,7 @@ load_level :: proc(level_bytes: []byte) -> json.Unmarshal_Error {
 			offset = { WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2 },
 		},
 		time_since_dialog = 10.0,
+		time_since_last_step = 20.0,
 		music = g_music[.CREEPIN_SPOOKIN],
 	}
 	mem.arena_init(&g_world.arena, g_world_memory)

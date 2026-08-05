@@ -230,7 +230,7 @@ step :: proc() -> bool {
         k2.set_camera(k2.Camera{
             zoom = 2,
         })
-        draw_hud(active_player_type)
+        draw_hud(active_player_type, delta_time)
     } else {
         k2.set_camera(k2.Camera{
             zoom = 2,
@@ -556,7 +556,7 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
     return
 }
 
-draw_hud :: proc(active_player_type: Player_Type) {
+draw_hud :: proc(active_player_type: Player_Type, delta_time: f32) {
 
     k2.draw_texture_rect(g_textures[.CHARACTERS], Player_Name_Rects[active_player_type], { 4, 4 })
 
@@ -614,6 +614,18 @@ draw_hud :: proc(active_player_type: Player_Type) {
         bg_y := SCREEN_HEIGHT - DIALOG_HEIGHT + min(g_world.time_since_dialog, TRANSITION_TIME) * (1 / TRANSITION_TIME) * DIALOG_HEIGHT
         k2.draw_rect(k2.Rect{ x = 0, y = bg_y, w = SCREEN_WIDTH, h = DIALOG_HEIGHT }, k2.BLACK)
         k2.draw_rect(k2.Rect{ x= 0, y = bg_y + 1, w = SCREEN_WIDTH, h = 1}, k2.WHITE)
+    }
+
+    // Draw instructions
+    @(static) instructions_a := f32(0.0)
+    instructions := g_textures[.INSTRUCTIONS_EN]
+    if g_world.time_since_last_step > 5.0 {
+        instructions_a = min(1.0, instructions_a + delta_time)
+    } else {
+        instructions_a = max(0, instructions_a - delta_time)
+    }
+    if instructions_a > 0.0 {
+        k2.draw_texture(instructions, {SCREEN_WIDTH - f32(instructions.width), 0}, {}, 0, k2.color_alpha(k2.WHITE, u8(instructions_a * 255)))
     }
 }
 
