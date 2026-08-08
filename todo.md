@@ -1,6 +1,6 @@
-- Support high DPI
 - Tutorial dialog
 - Title screen
+- Language selection
 - More decoration
-- Character portraits
+- Support high DPI
 - Secret item

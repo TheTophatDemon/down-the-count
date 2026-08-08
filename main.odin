@@ -16,6 +16,11 @@ SCREEN_WIDTH :: WINDOW_WIDTH / 2
 SCREEN_HEIGHT :: WINDOW_HEIGHT / 2
 TILE_SIZE :: 32
 
+Language :: enum {
+    English,
+    Russian,
+}
+
 Entity_Handle :: hm.Handle32
 
 Entity_Data :: union {
@@ -66,7 +71,7 @@ g_world := struct{
     floors: [dynamic]int,
     camera: k2.Camera,
     time_since_start: f32,
-    time_since_last_step: f32,
+    time_since_last_input: f32,
     time_since_dialog: f32,
     time_since_dialog_character: f32,
     dialog: string,
@@ -125,7 +130,7 @@ step :: proc() -> bool {
 
     delta_time := k2.get_frame_time()
     g_world.time_since_start += delta_time
-    g_world.time_since_last_step += delta_time
+    g_world.time_since_last_input += delta_time
     g_world.time_since_dialog += delta_time
     g_world.time_since_dialog_character += delta_time
 
@@ -148,6 +153,7 @@ step :: proc() -> bool {
     if len(g_world.dialog) != 0 {
         // Advance dialog when pressing a key
         if k2.key_went_down(.Z) || k2.key_went_down(.Enter) || k2.key_went_down(.Space) {
+            g_world.time_since_last_input = 0.0
             if g_world.dialog_shown_length != len(g_world.dialog_shown_line) {
                 // Skip to end of line
                 g_world.dialog_shown_length = len(g_world.dialog_shown_line)
@@ -213,7 +219,7 @@ step :: proc() -> bool {
         }
 
         if step_time {
-            g_world.time_since_last_step = 0.0
+            g_world.time_since_last_input = 0.0
             if len(g_previous_time_steps) == cap(g_previous_time_steps) {
                 pop_front(&g_previous_time_steps)
             }
@@ -422,7 +428,7 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
         // }
         // sprite_pos := target_sprite_pos
         // if target_sprite_pos != previous_sprite_pos {
-        //     t := min(1.0, g_world.time_since_last_step * 4.0)
+        //     t := min(1.0, g_world.time_since_last_input * 4.0)
         //     sprite_pos = previous_sprite_pos + (target_sprite_pos - previous_sprite_pos) * ease.cubic_out(t)
         // }
         sprite_pos := cast([2]f32)(ent.pos * TILE_SIZE)
@@ -558,7 +564,7 @@ draw_world :: proc() -> (active_player_type: Player_Type) {
 
 draw_hud :: proc(active_player_type: Player_Type, delta_time: f32) {
 
-    k2.draw_texture_rect(g_textures[.CHARACTERS], Player_Name_Rects[active_player_type], { 4, 4 })
+    k2.draw_texture_rect(g_textures[.CHARACTERS], Player_Name_Rects[.English][active_player_type], { 4, 4 })
 
     // Draw inventory
     for handle, i in g_world.inventories[active_player_type] {
@@ -591,6 +597,17 @@ draw_hud :: proc(active_player_type: Player_Type, delta_time: f32) {
         k2.draw_rect(k2.Rect{ x = 0, y = bg_y, w = SCREEN_WIDTH, h = DIALOG_HEIGHT }, k2.BLACK)
         k2.draw_rect(k2.Rect{ x= 0, y = bg_y + 1, w = SCREEN_WIDTH, h = 1}, k2.WHITE)
         if g_world.time_since_dialog > TRANSITION_TIME {
+            portrait_rect: k2.Rect
+            for tag, player_type in Player_Dialog_Tags {
+                if strings.starts_with(g_world.dialog_shown_line, tag) {
+                    portrait_rect = Player_Portrait_Rects[player_type]
+                    break
+                }
+            }
+            if strings.starts_with(g_world.dialog_shown_line, "Count Venizi:") {
+                portrait_rect = k2.Rect{ x = 96, y = 32, w = 64, h = 64 }
+            }
+
             if g_world.time_since_dialog_character > CHARACTER_SPEED {
                 g_world.time_since_dialog_character = 0.0
                 g_world.dialog_shown_length = min(g_world.dialog_shown_length + 1, len(g_world.dialog_shown_line))
@@ -608,7 +625,17 @@ draw_hud :: proc(active_player_type: Player_Type, delta_time: f32) {
                 k2.set_sound_volume(g_sounds[.TYPE], rand.float32_range(0.5, 1.5))
                 k2.play_sound(g_sounds[.TYPE])
             }
-            k2.draw_text(g_world.dialog_shown_line[:g_world.dialog_shown_length], { 4, bg_y + 4 }, 16, k2.WHITE)
+
+            if portrait_rect.w > 0 {
+                k2.draw_texture_rect(g_textures[.CHARACTERS], portrait_rect, { 0, bg_y })
+            }
+
+            k2.draw_text(
+                g_world.dialog_shown_line[:g_world.dialog_shown_length], 
+                { 4 + (portrait_rect.w * 1.2), bg_y + 4 }, 
+                16, 
+                k2.WHITE,
+            )
         }
     } else if g_world.time_since_dialog < TRANSITION_TIME {
         bg_y := SCREEN_HEIGHT - DIALOG_HEIGHT + min(g_world.time_since_dialog, TRANSITION_TIME) * (1 / TRANSITION_TIME) * DIALOG_HEIGHT
@@ -619,7 +646,7 @@ draw_hud :: proc(active_player_type: Player_Type, delta_time: f32) {
     // Draw instructions
     @(static) instructions_a := f32(0.0)
     instructions := g_textures[.INSTRUCTIONS_EN]
-    if g_world.time_since_last_step > 5.0 {
+    if g_world.time_since_last_input > 5.0 {
         instructions_a = min(1.0, instructions_a + delta_time)
     } else {
         instructions_a = max(0, instructions_a - delta_time)

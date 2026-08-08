@@ -30,11 +30,35 @@ Muji_Disguise_Rects := [Player_Type]k2.Rect{
 }
 
 @(rodata)
-Player_Name_Rects := [Player_Type]k2.Rect{
-	.MUJI = { x = 0, y = 128, w = 64, h = 32 },
-	.PANETTONE = { x = 0, y = 160, w = 128, h = 32 },
-	.POLENTA = { x = 0, y = 192, w = 96, h = 32 },
-	.BOROMI = { x = 0, y = 224, w = 96, h = 32 },
+Player_Name_Rects := [Language][Player_Type]k2.Rect{
+	.English = {
+		.MUJI = { x = 0, y = 128, w = 64, h = 32 },
+		.PANETTONE = { x = 0, y = 160, w = 128, h = 32 },
+		.POLENTA = { x = 0, y = 192, w = 96, h = 32 },
+		.BOROMI = { x = 0, y = 224, w = 96, h = 32 },
+	},
+	.Russian = {
+		.MUJI = { x = 64, y = 128, w = 64, h = 32 },
+		.PANETTONE = { x = 64, y = 96, w = 112, h = 32 },
+		.POLENTA = { x = 96, y = 192, w = 96, h = 32 },
+		.BOROMI = { x = 96, y = 224, w = 96, h = 32 },
+	},
+}
+
+@(rodata)
+Player_Portrait_Rects := [Player_Type]k2.Rect{
+	.MUJI = { x = 192, y = 0, w = 64, h = 64 },
+	.PANETTONE = { x = 192, y = 64, w = 64, h = 64 },
+	.POLENTA = { x = 192, y = 128, w = 64, h = 64 },
+	.BOROMI = { x = 192, y = 192, w = 64, h = 64 },
+}
+
+@(rodata)
+Player_Dialog_Tags := [Player_Type]string{
+	.MUJI = "Muji:",
+	.PANETTONE = "Panettone:",
+	.POLENTA = "Polenta:",
+	.BOROMI = "Boromi:",
 }
 
 Player_Data :: struct {
